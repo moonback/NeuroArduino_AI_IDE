@@ -149,7 +149,7 @@ async def search_libraries(query: str):
         import json
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            return json.loads(result.stdout) if result.stdout.strip() else {"libraries": []}
+            return json.loads(result.stdout) if (result.stdout and result.stdout.strip()) else {"libraries": []}
         return {"libraries": []}
     except Exception as e:
         print(f"Library Search Error: {e}")
@@ -163,7 +163,7 @@ async def list_installed_libraries():
         import json
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            return json.loads(result.stdout) if result.stdout.strip() else {"libraries": []}
+            return json.loads(result.stdout) if (result.stdout and result.stdout.strip()) else {"libraries": []}
         return {"libraries": []}
     except Exception as e:
         print(f"Library List Error: {e}")
@@ -193,7 +193,7 @@ async def search_cores(query: str):
         import json
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            return json.loads(result.stdout) if result.stdout.strip() else []
+            return json.loads(result.stdout) if (result.stdout and result.stdout.strip()) else []
         return []
     except Exception as e:
         print(f"Board Search Error: {e}")
@@ -207,7 +207,7 @@ async def list_installed_cores():
         import json
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            return json.loads(result.stdout) if result.stdout.strip() else []
+            return json.loads(result.stdout) if (result.stdout and result.stdout.strip()) else []
         return []
     except Exception as e:
         print(f"Board List Error: {e}")
