@@ -376,6 +376,45 @@ function App() {
         onCancel={closeModal}
       />
 
+      {/* Activity Bar */}
+      <div style={{ width: '48px', minWidth: '48px', background: '#111b27', borderRight: '1px solid #30363d', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: '16px', zIndex: 20 }}>
+        <button 
+          onClick={() => setShowSidebar(!showSidebar)}
+          className={`p-2 rounded transition-colors ${showSidebar ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          title={t('explorer')}
+        >
+          <ListFilter size={20} />
+        </button>
+        <button 
+          onClick={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
+          className={`p-2 rounded transition-colors ${showBoardManager ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          title={t('boards')}
+        >
+          <Cpu size={20} />
+        </button>
+        <button 
+          onClick={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
+          className={`p-2 rounded transition-colors ${showLibraryManager ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          title={t('libraries')}
+        >
+          <Package size={20} />
+        </button>
+        <button 
+          onClick={() => setShowVisionPanel(true)}
+          className="p-2 rounded text-gray-500 hover:text-cyan-400 transition-colors"
+          title={t('vision')}
+        >
+          <Camera size={20} />
+        </button>
+        <div style={{ flexGrow: 1 }}></div>
+        <button 
+          className="p-2 rounded text-gray-500 hover:text-gray-300 transition-colors"
+          title={t('settings') || "Settings"}
+        >
+          <Settings size={20} />
+        </button>
+      </div>
+
       {/* Left Sidebar */}
       {showSidebar && (
         <Sidebar
@@ -384,9 +423,6 @@ function App() {
           onFileClick={handleFileClick}
           onCreateFile={handleCreateFileClick}
           onCreateFolder={handleCreateFolderClick}
-          onToggleLibraryManager={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
-          onToggleBoardManager={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
-          onToggleVisionPanel={() => { setShowVisionPanel(true); }}
         />
       )}
 
@@ -398,17 +434,7 @@ function App() {
       <div className="flex flex-col grow min-w-0" style={{ background: '#0b0f14' }}>
 
         {/* Toolbar */}
-        <div style={{ minHeight: '52px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '16px', background: '#161b22', zIndex: 10, flexWrap: 'wrap' }}>
-          <button 
-            onClick={() => setShowSidebar(!showSidebar)}
-            className={`p-2 rounded transition-colors ${showSidebar ? 'text-accent' : 'text-gray-400'}`}
-            title={t('explorer')}
-          >
-            <ListFilter size={18} />
-          </button>
-
-          <div className="h-6 w-px bg-gray-700"></div>
-
+        <div style={{ minHeight: '44px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '12px', background: '#161b22', zIndex: 10, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"

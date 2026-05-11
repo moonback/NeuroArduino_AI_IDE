@@ -1,7 +1,7 @@
 import { FileCode, Folder, Plus, Package, Cpu, Camera } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder, onToggleLibraryManager, onToggleBoardManager, onToggleVisionPanel }) => {
+const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder }) => {
     const { t } = useTranslation();
     return (
         <div className="panel-sidebar" style={{ width: '250px', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
@@ -9,12 +9,9 @@ const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFo
             <div style={{ padding: '8px 12px', background: '#111b27', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, letterSpacing: '0.5px', color: '#8b9bb4' }}>{t('explorer')}</span>
                 <div style={{ display: 'flex', gap: '2px' }}>
-                    <button onClick={onToggleVisionPanel} title={t('vision')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-cyan-400 transition-colors"><Camera size={14} /></button>
-                    <button onClick={onToggleBoardManager} title={t('boards')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Cpu size={14} /></button>
-                    <button onClick={onToggleLibraryManager} title={t('libraries')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Package size={14} /></button>
                     <button onClick={onCreateFile} title={t('newFile')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><FileCode size={14} /></button>
                     <button onClick={onCreateFolder} title={t('newFolder')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
-                    <button onClick={onOpenFolder} title={t('openFolder')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
+                    <button onClick={onOpenFolder} title={t('openFolder')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Plus size={14} /></button>
                 </div>
             </div>
 

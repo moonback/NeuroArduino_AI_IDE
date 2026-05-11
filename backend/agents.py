@@ -40,7 +40,7 @@ class CodeGeneratorAgent:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
-            self.gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+            self.gemini_model = genai.GenerativeModel("gemini-2.5-flash")
         else:
             self.gemini_model = None
 
@@ -163,7 +163,7 @@ class VisionAgent:
         if self.gemini_api_key:
             genai.configure(api_key=self.gemini_api_key)
             # Use a model that supports multimodal input
-            self.model = genai.GenerativeModel("gemini-1.5-flash")
+            self.model = genai.GenerativeModel("gemini-2.5-flash")
         else:
             self.model = None
 

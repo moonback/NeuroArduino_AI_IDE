@@ -72,7 +72,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
                     }}
                 >
                     <option value="groq">Groq (Llama 3)</option>
-                    <option value="gemini">Gemini 1.5 Flash</option>
+                    <option value="gemini">Gemini 2.5 Flash</option>
                 </select>
             </div>
 
