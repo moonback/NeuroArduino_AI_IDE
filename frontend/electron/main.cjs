@@ -215,18 +215,61 @@ function createWindow() {
         if (canceled) return null;
 
         const dirPath = filePaths[0];
+        
+        // Recursive function to read directory tree
+        const readDirRecursive = async (currentPath, relativePath = '') => {
+            try {
+                const files = await fs.promises.readdir(currentPath, { withFileTypes: true });
+                const fileList = [];
+                
+                for (const file of files) {
+                    const fullPath = path.join(currentPath, file.name);
+                    const relPath = relativePath ? path.join(relativePath, file.name) : file.name;
+                    
+                    fileList.push({
+                        name: file.name,
+                        isDirectory: file.isDirectory(),
+                        path: relPath
+                    });
+                    
+                    // If it's a directory, read its contents recursively
+                    if (file.isDirectory()) {
+                        const subFiles = await readDirRecursive(fullPath, relPath);
+                        fileList.push(...subFiles);
+                    }
+                }
+                
+                return fileList;
+            } catch (err) {
+                console.error(`Error reading directory ${currentPath}:`, err);
+                return [];
+            }
+        };
+        
         try {
-            const files = await fs.promises.readdir(dirPath, { withFileTypes: true });
-            const fileList = files.map(file => ({
-                name: file.name,
-                isDirectory: file.isDirectory(),
-                path: path.join(dirPath, file.name)
+            const allFiles = await readDirRecursive(dirPath);
+            
+            // Normalize paths to use forward slashes for consistency
+            const normalizedFiles = allFiles.map(file => ({
+                ...file,
+                path: file.path.replace(/\\/g, '/')
             }));
-            // Sort: directories first
-            fileList.sort((a, b) => (a.isDirectory === b.isDirectory ? 0 : a.isDirectory ? -1 : 1));
-            return { path: dirPath, files: fileList };
+            
+            // Sort: directories first, then alphabetically
+            normalizedFiles.sort((a, b) => {
+                if (a.isDirectory === b.isDirectory) {
+                    return a.name.localeCompare(b.name);
+                }
+                return a.isDirectory ? -1 : 1;
+            });
+            
+            console.log('Opened folder:', dirPath);
+            console.log('Total files found:', normalizedFiles.length);
+            console.log('Sample files:', normalizedFiles.slice(0, 5));
+            
+            return { path: dirPath, files: normalizedFiles };
         } catch (err) {
-            console.error(err);
+            console.error('Error opening folder:', err);
             return null;
         }
     });

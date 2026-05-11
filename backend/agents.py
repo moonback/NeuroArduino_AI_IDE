@@ -1,9 +1,12 @@
 import os
 import re
+import json
 from groq import Groq
 import google.generativeai as genai
 import sys
 from dotenv import load_dotenv
+from tools_registry import ToolRegistry
+from system_prompts import get_prompt_manager
 
 # Env Loading Logic
 search_paths = [
@@ -27,7 +30,7 @@ else:
     print("Warning: No .env file found!")
 
 class CodeGeneratorAgent:
-    def __init__(self):
+    def __init__(self, workspace_root: str = None):
         # Groq Setup
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         if self.groq_api_key:
@@ -43,25 +46,33 @@ class CodeGeneratorAgent:
             self.gemini_model = genai.GenerativeModel("gemini-2.5-flash")
         else:
             self.gemini_model = None
+        
+        # Tool Registry
+        self.tool_registry = ToolRegistry(workspace_root)
+        
+        # System Prompt Manager
+        self.prompt_manager = get_prompt_manager()
 
-    def generate(self, prompt: str, board: str, provider: str = "groq", history: list = None) -> str:
-        system_instruction = (
-            "You are Audino, an AI-powered Arduino IDE and code generator.\n"
-            "Your only task is to generate clean, correct, and compilable Arduino code from simple natural language instructions.\n"
-            "Always output valid Arduino C/C++ code.\n"
-            f"Assume Arduino Uno unless specified otherwise. Current Target: {board}.\n"
-            "Always include setup() and loop().\n"
-            "Prefer simplicity over complexity.\n"
-            "Infer sensible defaults when details are missing.\n"
-            "Output only code. No explanations. No markdown."
+    def generate(self, prompt: str, board: str, provider: str = "groq", history: list = None, enable_tools: bool = True) -> dict:
+        # Get appropriate system prompt with tool calling capabilities
+        tool_definitions = ""
+        if enable_tools:
+            tool_definitions = self.tool_registry.get_tool_definitions_text()
+        
+        system_instruction = self.prompt_manager.get_combined_prompt(
+            contexts=["base", "code_generation"],
+            board=board,
+            enable_tools=enable_tools,
+            tool_definitions=tool_definitions
         )
 
         history = history or []
 
-        # 1. Groq Provider
+        # 1. Groq Provider (with function calling support)
         if provider == "groq" and self.groq_client:
             try:
                 messages = [{"role": "system", "content": system_instruction}]
+                
                 # Add history
                 for msg in history:
                     messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
@@ -69,20 +80,97 @@ class CodeGeneratorAgent:
                 # Add current prompt
                 messages.append({"role": "user", "content": prompt})
 
-                completion = self.groq_client.chat.completions.create(
-                    messages=messages,
-                    model=self.groq_model,
-                )
-                code = completion.choices[0].message.content
-                return self._clean_code(code)
+                # Check if Groq supports function calling (it does for some models)
+                if enable_tools:
+                    # Try with function calling
+                    try:
+                        completion = self.groq_client.chat.completions.create(
+                            messages=messages,
+                            model=self.groq_model,
+                            tools=self.tool_registry.get_tool_definitions(),
+                            tool_choice="auto"
+                        )
+                        
+                        response_message = completion.choices[0].message
+                        
+                        # Check if AI wants to use tools
+                        if response_message.tool_calls:
+                            tool_calls = []
+                            tool_results = []
+                            
+                            for tool_call in response_message.tool_calls:
+                                tool_name = tool_call.function.name
+                                tool_params = json.loads(tool_call.function.arguments)
+                                
+                                # Execute tool
+                                result = self.tool_registry.execute_tool(tool_name, tool_params)
+                                
+                                tool_calls.append({
+                                    "id": tool_call.id,
+                                    "tool": tool_name,
+                                    "parameters": tool_params
+                                })
+                                
+                                tool_results.append({
+                                    "id": tool_call.id,
+                                    "tool": tool_name,
+                                    "result": result
+                                })
+                            
+                            return {
+                                "message": response_message.content or "I've executed the requested operations.",
+                                "tool_calls": tool_calls,
+                                "tool_results": tool_results,
+                                "code": None
+                            }
+                        else:
+                            # No tool calls, just return the message
+                            content = response_message.content
+                            code = self._extract_code(content)
+                            return {
+                                "message": content if not code else self._remove_code_from_message(content),
+                                "code": code,
+                                "tool_calls": [],
+                                "tool_results": []
+                            }
+                    
+                    except Exception as e:
+                        # Fallback to regular completion if function calling fails
+                        print(f"Function calling failed, falling back: {e}")
+                        completion = self.groq_client.chat.completions.create(
+                            messages=messages,
+                            model=self.groq_model,
+                        )
+                        content = completion.choices[0].message.content
+                        return self._parse_response_with_tools(content)
+                else:
+                    # Tools disabled, regular generation
+                    completion = self.groq_client.chat.completions.create(
+                        messages=messages,
+                        model=self.groq_model,
+                    )
+                    content = completion.choices[0].message.content
+                    code = self._extract_code(content)
+                    return {
+                        "message": content if not code else self._remove_code_from_message(content),
+                        "code": code,
+                        "tool_calls": [],
+                        "tool_results": []
+                    }
+                    
             except Exception as e:
                 print(f"Groq API Error: {e}")
-                return f"// Error: Groq Generation Failed.\n// Details: {str(e)}"
+                return {
+                    "message": f"Error: Groq Generation Failed.\nDetails: {str(e)}",
+                    "code": None,
+                    "tool_calls": [],
+                    "tool_results": []
+                }
 
         # 2. Gemini Provider
         elif provider == "gemini" and self.gemini_model:
             try:
-                # Gemini chat history format: [{'role': 'user', 'parts': ['...']}, {'role': 'model', 'parts': ['...']}]
+                # Gemini chat history format
                 chat_history = []
                 for msg in history:
                     role = "user" if msg.get("role") == "user" else "model"
@@ -90,14 +178,79 @@ class CodeGeneratorAgent:
                 
                 chat = self.gemini_model.start_chat(history=chat_history)
                 response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
-                code = response.text
-                return self._clean_code(code)
+                content = response.text
+                
+                # Parse response for tool calls
+                return self._parse_response_with_tools(content)
+                
             except Exception as e:
                 print(f"Gemini API Error: {e}")
-                return f"// Error: Gemini Generation Failed.\n// Details: {str(e)}"
+                return {
+                    "message": f"Error: Gemini Generation Failed.\nDetails: {str(e)}",
+                    "code": None,
+                    "tool_calls": [],
+                    "tool_results": []
+                }
 
-        # 3. Offline/Fallback Logic (if keys missing or invalid provider)
-        return self._generate_offline(prompt, board)
+        # 3. Offline/Fallback Logic
+        return {
+            "message": self._generate_offline(prompt, board),
+            "code": self._generate_offline(prompt, board),
+            "tool_calls": [],
+            "tool_results": []
+        }
+    
+    def _parse_response_with_tools(self, content: str) -> dict:
+        """Parse AI response that might contain tool calls in JSON format"""
+        # Try to extract JSON tool calls
+        try:
+            # Look for JSON block
+            json_match = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
+            if json_match:
+                tool_data = json.loads(json_match.group(1))
+                
+                if "tool_calls" in tool_data:
+                    # Execute tools
+                    tool_results = []
+                    for tool_call in tool_data["tool_calls"]:
+                        result = self.tool_registry.execute_tool(
+                            tool_call["tool"],
+                            tool_call["parameters"]
+                        )
+                        tool_results.append({
+                            "id": tool_call.get("id", "unknown"),
+                            "tool": tool_call["tool"],
+                            "result": result
+                        })
+                    
+                    return {
+                        "message": tool_data.get("message", "Operations executed."),
+                        "code": tool_data.get("code"),
+                        "tool_calls": tool_data["tool_calls"],
+                        "tool_results": tool_results
+                    }
+        except Exception as e:
+            print(f"Failed to parse tool calls: {e}")
+        
+        # No tool calls found, treat as regular response
+        code = self._extract_code(content)
+        return {
+            "message": content if not code else self._remove_code_from_message(content),
+            "code": code,
+            "tool_calls": [],
+            "tool_results": []
+        }
+    
+    def _extract_code(self, content: str) -> str:
+        """Extract code from markdown code blocks"""
+        code_match = re.search(r'```(?:cpp|c\+\+|arduino|c)?\s*\n?(.*?)```', content, re.DOTALL)
+        if code_match:
+            return code_match.group(1).strip()
+        return None
+    
+    def _remove_code_from_message(self, content: str) -> str:
+        """Remove code blocks from message"""
+        return re.sub(r'```(?:cpp|c\+\+|arduino|c)?\s*\n?.*?```', '', content, flags=re.DOTALL).strip()
 
     def _clean_code(self, code: str) -> str:
         code = code.replace("```cpp", "").replace("```c++", "").replace("```arduino", "").replace("```", "").strip()
@@ -166,6 +319,9 @@ class VisionAgent:
             self.model = genai.GenerativeModel("gemini-2.5-flash")
         else:
             self.model = None
+        
+        # System Prompt Manager
+        self.prompt_manager = get_prompt_manager()
 
     def analyze(self, image_data: str, prompt: str = "", board: str = "arduino:avr:uno") -> dict:
         """
@@ -193,19 +349,11 @@ class VisionAgent:
 
             image_bytes = base64.b64decode(b64_data)
 
-            system_prompt = (
-                "You are Audino Vision, an expert Arduino wiring analyzer.\n"
-                "You are given a photo of an Arduino/electronics breadboard wiring setup.\n\n"
-                "Your task is to:\n"
-                "1. IDENTIFY all visible electronic components (LEDs, resistors, sensors, motors, buttons, etc.)\n"
-                "2. TRACE the wiring connections between components and the Arduino board\n"
-                "3. DETERMINE which Arduino pins are connected to which components\n"
-                "4. GENERATE clean, correct, compilable Arduino code that matches the wiring\n\n"
-                f"Target board: {board}\n\n"
-                "You MUST respond in EXACTLY this format (use these exact headers):\n"
-                "COMPONENTS: comma-separated list of detected components\n"
-                "EXPLANATION: 2-3 sentence description of the circuit and what the code does\n"
-                "CODE:\n```\n<your Arduino code here>\n```\n"
+            # Get vision-specific system prompt
+            system_prompt = self.prompt_manager.get_prompt(
+                context="vision",
+                board=board,
+                enable_tools=False
             )
 
             user_msg = "Analyze this Arduino wiring photo and generate the corresponding code."
@@ -282,21 +430,24 @@ code_agent = CodeGeneratorAgent()
 safety_agent = HardwareRulesAgent()
 vision_agent = VisionAgent()
 
-def process_ai_request(prompt: str, board: str, provider: str = "groq", history: list = None):
-    # 1. Generate Code
-    code = code_agent.generate(prompt, board, provider, history)
+def process_ai_request(prompt: str, board: str, provider: str = "groq", history: list = None, enable_tools: bool = True):
+    # 1. Generate Code or Execute Tools
+    result = code_agent.generate(prompt, board, provider, history, enable_tools)
     
-    # 2. Safety Check
-    warnings = safety_agent.check_safety(prompt, code)
+    # 2. Safety Check on generated code
+    if result.get("code"):
+        warnings = safety_agent.check_safety(prompt, result["code"])
+        if warnings:
+            result["message"] = result.get("message", "") + "\n\n" + "\n".join(warnings)
     
-    explanation = f"I've generated the code for you using {provider.capitalize()}."
-    if "Offline Mode" in code:
-        explanation = "I've generated a basic template (Offline Mode)."
+    # 3. Add explanation if not present
+    if not result.get("message"):
+        if result.get("tool_calls"):
+            result["message"] = f"I've executed {len(result['tool_calls'])} operation(s) for you."
+        elif result.get("code"):
+            result["message"] = f"I've generated the code for you using {provider.capitalize()}."
     
-    if warnings:
-        explanation += "\n\n" + "\n".join(warnings)
-    
-    return {"code": code, "explanation": explanation}
+    return result
 
 def process_vision_request(image_data: str, prompt: str = "", board: str = "arduino:avr:uno"):
     # 1. Vision Analysis

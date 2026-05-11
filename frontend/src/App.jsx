@@ -1,18 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import CodeEditor from './components/Editor';
-import Sidebar from './components/Sidebar';
+import axios from 'axios';
+import { Activity, Camera, Cpu, FilePlus, ListFilter, Package, PlugZap, RefreshCw, Save, Settings as SettingsIcon, Sparkles, Terminal as TerminalIcon, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AIPanel from './components/AIPanel';
-import Terminal from './components/Terminal';
-import SerialMonitor from './components/SerialMonitor';
-import SerialPlotter from './components/SerialPlotter';
+import BoardManager from './components/BoardManager';
+import CodeEditor from './components/Editor';
 import InputModal from './components/InputModal';
 import LibraryManager from './components/LibraryManager';
-import BoardManager from './components/BoardManager';
-import VisionPanel from './components/VisionPanel';
+import SerialMonitor from './components/SerialMonitor';
+import SerialPlotter from './components/SerialPlotter';
 import Settings from './components/Settings';
-import { Play, Upload, Settings as SettingsIcon, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera, Sparkles } from 'lucide-react';
-import axios from 'axios';
-import { useTranslation } from 'react-i18next';
+import Sidebar from './components/Sidebar';
+import Terminal from './components/Terminal';
+import VisionPanel from './components/VisionPanel';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -216,16 +216,40 @@ function App() {
     }
   };
 
+  const handleCloseFolder = async () => {
+    if (!(await checkForUnsavedChanges())) return;
+    
+    setFileTree(null);
+    setCurrentFile(null);
+    const defaultCode = '// Welcome to AI NeuroArduino IDE\nvoid setup() {\n  // Put your setup code here, to run once:\n}\n\nvoid loop() {\n  // Put your main code here, to run repeatedly:\n}\n';
+    initialCodeRef.current = defaultCode;
+    setCode(defaultCode);
+    setIsDirty(false);
+    addLog('Folder closed', 'info');
+  };
+
   const handleFileClick = async (file) => {
     if (!(await checkForUnsavedChanges())) return;
 
     if (window.api && window.api.fs) {
       try {
-        const content = await window.api.fs.readFile(file.path);
+        // Construct full path - file.path already contains the relative path with proper separators
+        // On Windows, we need to use backslashes; on Unix, forward slashes
+        const separator = fileTree.path.includes('\\') ? '\\' : '/';
+        const fullPath = `${fileTree.path}${separator}${file.path.replace(/\//g, separator)}`;
+        
+        console.log('Opening file:', { 
+          basePath: fileTree?.path, 
+          relativePath: file.path, 
+          fullPath,
+          separator
+        });
+        
+        const content = await window.api.fs.readFile(fullPath);
         if (content !== null) {
           initialCodeRef.current = content;
           setCode(content);
-          setCurrentFile(file);
+          setCurrentFile({ ...file, fullPath });
           setIsDirty(false);
           addLog(`Opened file: ${file.name}`, 'info');
         } else {
@@ -233,6 +257,36 @@ function App() {
         }
       } catch (err) {
         addLog(`Error reading file: ${err}`, 'error');
+      }
+    }
+  };
+
+  const handleOpenFileByPath = async (path) => {
+    // Helper function to open file by path (for AI tool calling)
+    const fileName = path.split(/[\\/]/).pop();
+    await handleFileClick({ path, name: fileName, isDirectory: false });
+  };
+  
+  const handleFileModified = async (path) => {
+    // Reload file if it's currently open in editor
+    if (currentFile && currentFile.path === path) {
+      if (window.api && window.api.fs) {
+        try {
+          const content = await window.api.fs.readFile(path);
+          if (content !== null) {
+            initialCodeRef.current = content;
+            setCode(content);
+            setIsDirty(false);
+            addLog(`File reloaded: ${path}`, 'info');
+          }
+        } catch (err) {
+          addLog(`Error reloading file: ${err}`, 'error');
+        }
+      }
+    } else {
+      // File not currently open, just refresh file tree
+      if (fileTree) {
+        refreshFileTree(fileTree.path);
       }
     }
   };
@@ -426,6 +480,7 @@ function App() {
           onFileClick={handleFileClick}
           onCreateFile={handleCreateFileClick}
           onCreateFolder={handleCreateFolderClick}
+          onCloseFolder={handleCloseFolder}
         />
       )}
 
@@ -617,7 +672,17 @@ function App() {
       </div>
 
       {/* Right AI Panel */}
-      {showAIPanel && <AIPanel onApplyCode={onCodeChange} onOpenVision={() => setShowVisionPanel(true)} />}
+      {showAIPanel && (
+        <AIPanel 
+          onApplyCode={onCodeChange} 
+          onOpenVision={() => setShowVisionPanel(true)} 
+          onOpenFile={handleOpenFileByPath} 
+          onFileModified={handleFileModified}
+          currentFile={currentFile}
+          currentCode={code}
+          fileTree={fileTree}
+        />
+      )}
     </div>
   );
 }

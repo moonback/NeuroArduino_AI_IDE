@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { Send, Cpu, Sparkles, Camera, ChevronRight, ChevronLeft } from 'lucide-react';
 import axios from 'axios';
+import { Camera, ChevronLeft, ChevronRight, Cpu, Send, Sparkles, Wrench } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import ToolCallDisplay from './ToolCallDisplay';
 
-const AIPanel = ({ onApplyCode, onOpenVision }) => {
+const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, currentFile, currentCode, fileTree }) => {
     const { t } = useTranslation();
     const [input, setInput] = useState('');
     const [provider, setProvider] = useState('groq'); // 'groq' or 'gemini'
+    const [enableTools, setEnableTools] = useState(true); // Enable tool calling
+    const [includeProjectContext, setIncludeProjectContext] = useState(false); // Include all project files
     const [messages, setMessages] = useState([
         { role: 'assistant', content: t('aiGreeting') }
     ]);
@@ -21,25 +24,101 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
         setLoading(true);
 
         try {
-            // Call Backend API with provider and history
+            // Get workspace path from Electron API
+            let workspacePath = null;
+            if (window.api && window.api.getWorkspacePath) {
+                workspacePath = await window.api.getWorkspacePath();
+            }
+            
+            // Prepare context with current file info
+            const context = {
+                current_file: currentFile ? {
+                    name: currentFile.name,
+                    path: currentFile.path,
+                    content: currentCode
+                } : null
+            };
+            
+            // Add project files if requested
+            if (includeProjectContext && fileTree) {
+                context.project_files = fileTree.files.map(file => ({
+                    name: file.name,
+                    path: file.path,
+                    isDirectory: file.isDirectory
+                }));
+                context.workspace_path = fileTree.path;
+            }
+            
+            // Call Backend API with provider, history, and tool calling
             const res = await axios.post('http://localhost:8001/ai/generate', { 
                 prompt: input,
                 provider: provider,
+                enable_tools: enableTools,
+                workspace_path: workspacePath || (fileTree ? fileTree.path : null),
+                context: context,
+                include_project_context: includeProjectContext,
                 history: messages.filter(m => !m.error).map(m => ({ 
                     role: m.role === 'assistant' ? 'assistant' : 'user', 
                     content: m.content 
                 }))
             });
+            
             const aiMsg = {
                 role: 'assistant',
-                content: res.data.explanation,
-                code: res.data.code
+                content: res.data.message || res.data.explanation,
+                code: res.data.code,
+                tool_calls: res.data.tool_calls || [],
+                tool_results: res.data.tool_results || []
             };
+            
+            // Auto-apply tool results to editor
+            if (aiMsg.tool_results && aiMsg.tool_results.length > 0) {
+                for (const result of aiMsg.tool_results) {
+                    if (result.result.status === 'success') {
+                        const toolCall = aiMsg.tool_calls.find(tc => tc.id === result.id);
+                        if (toolCall) {
+                            await handleToolResult(toolCall, result.result);
+                        }
+                    }
+                }
+            }
+            
             setMessages(prev => [...prev, aiMsg]);
         } catch (err) {
             setMessages(prev => [...prev, { role: 'assistant', content: t('errorAIBrain'), error: true }]);
         }
         setLoading(false);
+    };
+    
+    const handleToolResult = async (toolCall, result) => {
+        // Auto-apply file operations to the editor
+        switch (toolCall.tool) {
+            case 'create_file':
+                // Open the newly created file in editor
+                if (result.path && toolCall.parameters.content) {
+                    await onOpenFile(result.path);
+                    // The file is already created by backend, just open it
+                }
+                break;
+                
+            case 'modify_file':
+                // Reload the modified file if it's currently open
+                if (result.path) {
+                    await onFileModified(result.path);
+                }
+                break;
+                
+            case 'rename_file':
+                // Handle file rename
+                if (result.new_path) {
+                    await onFileModified(result.new_path);
+                }
+                break;
+                
+            default:
+                // Other tools don't need editor updates
+                break;
+        }
     };
 
     return (
@@ -62,7 +141,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
                             <span>{t('aiAssistant')}</span>
                         </div>
                         
-                        {/* Provider Selector */}
+                        {/* Provider Selector & Tools Toggle */}
                         <div className="ai-provider-selector">
                             <span className="provider-label">Model:</span>
                             <select 
@@ -73,8 +152,47 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
                                 <option value="groq">Groq Llama 3</option>
                                 <option value="gemini">Gemini 2.5</option>
                             </select>
+                            <button 
+                                onClick={() => setEnableTools(!enableTools)}
+                                className={`tools-toggle ${enableTools ? 'tools-active' : ''}`}
+                                title={enableTools ? 'Tools Enabled' : 'Tools Disabled'}
+                            >
+                                <Wrench size={14} />
+                            </button>
                         </div>
                     </div>
+                    
+                    {/* Project Context Toggle */}
+                    {fileTree && (
+                        <div className="ai-context-toggle">
+                            <label className="context-toggle-label">
+                                <input 
+                                    type="checkbox" 
+                                    checked={includeProjectContext}
+                                    onChange={(e) => setIncludeProjectContext(e.target.checked)}
+                                    className="context-toggle-checkbox"
+                                />
+                                <span className="context-toggle-text">
+                                    📁 Include all project files ({fileTree.files.length} files)
+                                </span>
+                            </label>
+                        </div>
+                    )}
+                    
+                    {/* Header continuation */}
+                    <div style={{ display: 'none' }}>
+                    </div>
+                    
+                    {/* Current File Indicator */}
+                    {currentFile && (
+                        <div className="ai-current-file">
+                            <div className="current-file-icon">📄</div>
+                            <div className="current-file-info">
+                                <div className="current-file-label">Current File:</div>
+                                <div className="current-file-name">{currentFile.name}</div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Messages */}
                     <div className="ai-messages-container">
@@ -94,6 +212,20 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
                                     <div className="ai-message-bubble">
                                         {msg.content}
                                     </div>
+
+                                    {/* Tool Calls Display */}
+                                    {msg.tool_calls && msg.tool_calls.length > 0 && (
+                                        <div className="ai-tool-calls">
+                                            {msg.tool_calls.map((toolCall, idx) => (
+                                                <ToolCallDisplay
+                                                    key={idx}
+                                                    toolCall={toolCall}
+                                                    toolResult={msg.tool_results?.[idx]}
+                                                    onOpenFile={onOpenFile}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Code Block */}
                                     {msg.code && (

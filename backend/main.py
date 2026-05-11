@@ -48,6 +48,10 @@ class AIQuery(BaseModel):
     board: str = "arduino:avr:uno"
     provider: str = "groq" # Default to groq
     history: Optional[List[dict]] = None
+    enable_tools: bool = True  # Enable tool calling by default
+    workspace_path: Optional[str] = None  # Workspace path for file operations
+    context: Optional[Dict] = None  # Current file context
+    include_project_context: bool = False  # Include all project files in context
 
 class VisionQuery(BaseModel):
     image_data: str  # base64 data URL
@@ -247,7 +251,65 @@ async def list_all_supported_boards():
 
 @app.post("/ai/generate")
 async def generate_code(query: AIQuery):
-    result = process_ai_request(query.prompt, query.board, query.provider, query.history)
+    # Use workspace path if provided, otherwise use current directory
+    workspace = query.workspace_path or os.getcwd()
+    
+    # Create agent with workspace
+    from agents import CodeGeneratorAgent
+    agent = CodeGeneratorAgent(workspace_root=workspace)
+    
+    # Build enhanced prompt with context
+    enhanced_prompt = query.prompt
+    context_parts = []
+    
+    # Add current file context
+    if query.context and query.context.get('current_file'):
+        current_file = query.context['current_file']
+        context_parts.append(f"[CURRENT FILE: '{current_file['name']}' at '{current_file['path']}']")
+        if current_file.get('content'):
+            context_parts.append(f"Current file content:\n```cpp\n{current_file['content']}\n```")
+    
+    # Add project context if requested
+    if query.include_project_context and query.context and query.context.get('project_files'):
+        project_files = query.context['project_files']
+        workspace_path = query.context.get('workspace_path', workspace)
+        
+        # Read content of relevant files (Arduino files, headers, etc.)
+        project_context = []
+        for file_info in project_files:
+            if file_info['isDirectory']:
+                continue
+            
+            # Only include relevant file types
+            file_ext = os.path.splitext(file_info['name'])[1].lower()
+            if file_ext in ['.ino', '.cpp', '.h', '.c', '.hpp']:
+                try:
+                    file_path = os.path.join(workspace_path, file_info['path'].replace('/', os.sep))
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        # Limit file size to avoid token overflow
+                        if len(content) < 5000:
+                            project_context.append(f"\n--- File: {file_info['path']} ---\n{content}")
+                        else:
+                            # Include only first 2000 chars for large files
+                            project_context.append(f"\n--- File: {file_info['path']} (truncated) ---\n{content[:2000]}...\n[File truncated]")
+                except Exception as e:
+                    print(f"Error reading file {file_info['path']}: {e}")
+        
+        if project_context:
+            context_parts.append(f"\n[PROJECT CONTEXT: {len(project_context)} files from workspace]\n" + "\n".join(project_context))
+    
+    # Combine context with prompt
+    if context_parts:
+        enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
+    
+    result = agent.generate(
+        enhanced_prompt, 
+        query.board, 
+        query.provider, 
+        query.history, 
+        query.enable_tools
+    )
     return result
 
 @app.post("/ai/vision")
