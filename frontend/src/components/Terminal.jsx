@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected }) => {
+    const { t } = useTranslation();
     const [input, setInput] = React.useState('');
     const endRef = React.useRef(null);
 
@@ -39,7 +41,7 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                 letterSpacing: '0.05em'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span>Serial Monitor</span>
+                    <span>{t('serialMonitor')}</span>
                     <span style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -56,7 +58,7 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                             borderRadius: '50%',
                             background: isConnected ? '#3fb950' : '#f85149'
                         }} />
-                        {isConnected ? 'Connected' : 'Disconnected'}
+                        {isConnected ? t('connected') : t('disconnected')}
                     </span>
                 </div>
 
@@ -92,7 +94,7 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                             fontSize: '10px'
                         }}
                     >
-                        Clear
+                        {t('clear')}
                     </button>
                 </div>
             </div>
@@ -115,7 +117,7 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                         <span style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{log.message}</span>
                     </div>
                 ))}
-                {logs.length === 0 && <div style={{ color: '#484f58', fontStyle: 'italic' }}>Waiting for data...</div>}
+                {logs.length === 0 && <div style={{ color: '#484f58', fontStyle: 'italic' }}>{t('waitingForData')}</div>}
                 <div ref={endRef} />
             </div>
 
@@ -134,7 +136,7 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type message to send..."
+                    placeholder={t('typeMessageToSend')}
                     style={{
                         background: 'transparent',
                         border: 'none',

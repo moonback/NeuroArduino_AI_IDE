@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Trash2, Zap, ZapOff, Wifi, WifiOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected, onConnect, onDisconnect, selectedPort }) => {
+    const { t } = useTranslation();
     const [input, setInput] = useState('');
     const endRef = useRef(null);
 
@@ -25,9 +27,9 @@ const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnect
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                         <Wifi size={14} className={isConnected ? "text-green-500" : "text-gray-600"} />
-                        <span>Serial Monitor</span>
+                        <span>{t('serialMonitor')}</span>
                         <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`} />
-                        <span className={isConnected ? "text-green-500" : "text-red-500"}>{isConnected ? 'Connected' : 'Disconnected'}</span>
+                        <span className={isConnected ? "text-green-500" : "text-red-500"}>{isConnected ? t('connected') : t('disconnected')}</span>
                     </div>
                     {selectedPort && (
                         <span className="text-[10px] bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d] text-gray-400">
@@ -55,12 +57,12 @@ const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnect
                             }`}
                     >
                         {isConnected ? <WifiOff size={12} /> : <Wifi size={12} />}
-                        {isConnected ? 'Disconnect' : 'Connect'}
+                        {isConnected ? t('disconnect') : t('connect')}
                     </button>
 
                     <button
                         onClick={onClear}
-                        title="Clear Output"
+                        title={t('clearOutput')}
                         className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
                     >
                         <Trash2 size={14} />
@@ -72,7 +74,7 @@ const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnect
             <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar scroll-smooth">
                 {serialLogs.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-gray-600 italic animate-pulse">
-                        Waiting for serial data...
+                        {t('waitingForSerialData')}
                     </div>
                 ) : (
                     serialLogs.map((log, index) => (
@@ -102,7 +104,7 @@ const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnect
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={isConnected ? "Send data to Arduino..." : "Connect to send data..."}
+                        placeholder={isConnected ? t('sendToArduino') : t('connectToSend')}
                         disabled={!isConnected}
                         className="bg-transparent border-none outline-none text-gray-200 w-full placeholder:text-gray-600"
                     />

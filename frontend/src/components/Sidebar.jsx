@@ -1,18 +1,20 @@
 import { FileCode, Folder, Plus, Package, Cpu, Camera } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder, onToggleLibraryManager, onToggleBoardManager, onToggleVisionPanel }) => {
+    const { t } = useTranslation();
     return (
         <div style={{ width: '250px', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
             {/* Header */}
             <div style={{ padding: '8px 12px', background: '#111b27', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, letterSpacing: '0.5px', color: '#8b9bb4' }}>EXPLORER</span>
+                <span style={{ fontWeight: 600, letterSpacing: '0.5px', color: '#8b9bb4' }}>{t('explorer')}</span>
                 <div style={{ display: 'flex', gap: '2px' }}>
-                    <button onClick={onToggleVisionPanel} title="Vision-to-Wire" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-cyan-400 transition-colors"><Camera size={14} /></button>
-                    <button onClick={onToggleBoardManager} title="Board Manager" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Cpu size={14} /></button>
-                    <button onClick={onToggleLibraryManager} title="Library Manager" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Package size={14} /></button>
-                    <button onClick={onCreateFile} title="New File" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><FileCode size={14} /></button>
-                    <button onClick={onCreateFolder} title="New Folder" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
-                    <button onClick={onOpenFolder} title="Open Folder" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
+                    <button onClick={onToggleVisionPanel} title={t('vision')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-cyan-400 transition-colors"><Camera size={14} /></button>
+                    <button onClick={onToggleBoardManager} title={t('boards')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Cpu size={14} /></button>
+                    <button onClick={onToggleLibraryManager} title={t('libraries')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Package size={14} /></button>
+                    <button onClick={onCreateFile} title={t('newFile')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><FileCode size={14} /></button>
+                    <button onClick={onCreateFolder} title={t('newFolder')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
+                    <button onClick={onOpenFolder} title={t('openFolder')} className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Folder size={14} /></button>
                 </div>
             </div>
 
@@ -50,12 +52,12 @@ const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFo
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280', gap: '12px' }}>
                         <Folder size={32} opacity={0.5} />
                         <div style={{ textAlign: 'center' }}>
-                            <div style={{ marginBottom: '8px' }}>No Folder Open</div>
+                            <div style={{ marginBottom: '8px' }}>{t('noFolderOpen')}</div>
                             <button
                                 onClick={onOpenFolder}
                                 style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
                             >
-                                Open Folder
+                                {t('openFolder')}
                             </button>
                         </div>
                     </div>

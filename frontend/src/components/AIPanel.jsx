@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Send, Cpu, Sparkles, Camera } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const AIPanel = ({ onApplyCode, onOpenVision }) => {
+    const { t } = useTranslation();
     const [input, setInput] = useState('');
     const [provider, setProvider] = useState('groq'); // 'groq' or 'gemini'
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Hello! I am your Arduino AI Guide. What are we building today?' }
+        { role: 'assistant', content: t('aiGreeting') }
     ]);
     const [loading, setLoading] = useState(false);
 
@@ -34,7 +36,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
             };
             setMessages(prev => [...prev, aiMsg]);
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'assistant', content: 'Error connecting to AI Brain.', error: true }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: t('errorAIBrain'), error: true }]);
         }
         setLoading(false);
     };
@@ -51,7 +53,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
                     <Cpu size={16} color="var(--accent)" />
-                    <span>AI Assistant</span>
+                    <span>{t('aiAssistant')}</span>
                 </div>
                 
                 {/* Provider Selector */}

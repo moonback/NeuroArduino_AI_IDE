@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download, CheckCircle, Package, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const LibraryManager = ({ onClose }) => {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [libraries, setLibraries] = useState([]);
     const [installed, setInstalled] = useState([]);
@@ -41,9 +43,9 @@ const LibraryManager = ({ onClose }) => {
         try {
             await axios.post('http://localhost:8001/libraries/install', { name: libName });
             await fetchInstalled();
-            alert(`${libName} installed successfully!`);
+            alert(`${libName} ${t('installSuccess')}`);
         } catch (err) {
-            alert(`Failed to install ${libName}: ${err.response?.data?.detail || err.message}`);
+            alert(`${t('installFailed')} ${libName}: ${err.response?.data?.detail || err.message}`);
         }
         setInstalling(null);
     };
@@ -58,8 +60,8 @@ const LibraryManager = ({ onClose }) => {
         }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Package size={18} color="#3b82f6" />
-                    Library Manager
+                    <span style={{ color: '#3b82f6' }}><Package size={18} /></span>
+                    {t('libraryManager')}
                 </h3>
                 <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6e7681', cursor: 'pointer' }}>✕</button>
             </div>
@@ -71,7 +73,7 @@ const LibraryManager = ({ onClose }) => {
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                        placeholder="Search libraries (e.g. Servo, WiFi)..."
+                        placeholder={t('searchLibraries')}
                         style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', flexGrow: 1, fontSize: '13px', padding: '4px 0' }}
                     />
                 </div>
@@ -93,7 +95,7 @@ const LibraryManager = ({ onClose }) => {
                                     <span style={{ fontWeight: 600, color: '#c9d1d9', fontSize: '13px' }}>{lib.name}</span>
                                     {isInstalled(lib.name) ? (
                                         <span style={{ color: '#238636', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                                            <CheckCircle size={12} /> Installed
+                                            <CheckCircle size={12} /> {t('installed')}
                                         </span>
                                     ) : (
                                         <button 
@@ -106,21 +108,21 @@ const LibraryManager = ({ onClose }) => {
                                             }}
                                         >
                                             {installing === lib.name ? <Loader2 size={10} className="animate-spin" /> : <Download size={10} />}
-                                            Install
+                                            {t('install')}
                                         </button>
                                     )}
                                 </div>
                                 <span style={{ fontSize: '11px', color: '#8b949e', lineHeight: '1.4' }}>{lib.sentence}</span>
                                 <div style={{ display: 'flex', gap: '8px', fontSize: '10px', color: '#58a6ff', marginTop: '4px' }}>
                                     <span>v{lib.latest.version}</span>
-                                    <span>by {lib.author}</span>
+                                    <span>{t('by')} {lib.author}</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#6e7681', fontSize: '12px' }}>
-                        Search for a library to begin
+                        {t('searchLibraryToBegin')}
                     </div>
                 )}
             </div>

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera, Upload, X, Sparkles, Eye, Cpu, Zap, RefreshCw, Copy, Check, ImagePlus } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const VisionPanel = ({ onApplyCode, onClose }) => {
+    const { t } = useTranslation();
     const [image, setImage] = useState(null); // { src: dataURL, file: File }
     const [preview, setPreview] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
@@ -17,11 +19,11 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
     const handleFile = useCallback((file) => {
         if (!file) return;
         if (!file.type.startsWith('image/')) {
-            setError('Please upload an image file (JPG, PNG, WebP).');
+            setError(t('errorFileType'));
             return;
         }
         if (file.size > 20 * 1024 * 1024) {
-            setError('Image too large. Maximum 20MB.');
+            setError(t('errorFileSize'));
             return;
         }
 
@@ -94,7 +96,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                 components: res.data.components || []
             });
         } catch (err) {
-            const msg = err.response?.data?.detail || 'Vision analysis failed. Check that GEMINI_API_KEY is set.';
+            const msg = err.response?.data?.detail || t('errorVision');
             setError(msg);
         } finally {
             setAnalyzing(false);
@@ -119,8 +121,8 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                             <Camera size={16} />
                         </div>
                         <div>
-                            <div style={styles.title}>Vision-to-Wire</div>
-                            <div style={styles.subtitle}>Upload a photo → Get Arduino code</div>
+                            <div style={styles.title}>{t('visionToWire')}</div>
+                            <div style={styles.subtitle}>{t('uploadPhotoGetCode')}</div>
                         </div>
                     </div>
                     <button onClick={onClose} style={styles.closeBtn}>
@@ -153,13 +155,13 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                 <ImagePlus size={40} strokeWidth={1.5} />
                             </div>
                             <div style={styles.dropTitle}>
-                                {isDragging ? 'Drop your image here!' : 'Upload wiring photo'}
+                                {isDragging ? t('dropImageHere') : t('uploadWiringPhoto')}
                             </div>
                             <div style={styles.dropHint}>
-                                Drag & drop or click to browse
+                                {t('dragDropClick')}
                             </div>
                             <div style={styles.dropFormats}>
-                                JPG, PNG, WebP • Max 20MB
+                                JPG, PNG, WebP • {t('maxSize')}
                             </div>
                         </div>
                     ) : (
@@ -172,7 +174,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                 </button>
                                 {result && (
                                     <div style={styles.analyzedBadge}>
-                                        <Check size={12} /> Analyzed
+                                        <Check size={12} /> {t('analyzed')}
                                     </div>
                                 )}
                             </div>
@@ -183,7 +185,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                     value={additionalPrompt}
                                     onChange={(e) => setAdditionalPrompt(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !analyzing && analyzeImage()}
-                                    placeholder="Optional: describe what you want..."
+                                    placeholder={t('optionalDescribe')}
                                     style={styles.promptInput}
                                 />
                             </div>
@@ -200,12 +202,12 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                 {analyzing ? (
                                     <>
                                         <RefreshCw size={16} className="vision-spin" />
-                                        <span>Analyzing wiring...</span>
+                                        <span>{t('analyzingWiring')}</span>
                                     </>
                                 ) : (
                                     <>
                                         <Eye size={16} />
-                                        <span>{result ? 'Re-analyze' : 'Analyze Wiring'}</span>
+                                        <span>{result ? t('reAnalyze') : t('analyzeWiring')}</span>
                                     </>
                                 )}
                             </button>
@@ -231,15 +233,15 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                             <div style={styles.analyzingSteps}>
                                 <div style={styles.stepItem}>
                                     <Sparkles size={12} color="var(--accent)" />
-                                    <span>Identifying components...</span>
+                                    <span>{t('identifyingComponents')}</span>
                                 </div>
                                 <div style={styles.stepItem}>
                                     <Cpu size={12} color="#a78bfa" />
-                                    <span>Tracing connections...</span>
+                                    <span>{t('tracingConnections')}</span>
                                 </div>
                                 <div style={styles.stepItem}>
                                     <Zap size={12} color="#fbbf24" />
-                                    <span>Generating code...</span>
+                                    <span>{t('generatingCode')}</span>
                                 </div>
                             </div>
                         </div>
@@ -253,7 +255,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                 <div style={styles.componentsBox}>
                                     <div style={styles.sectionLabel}>
                                         <Cpu size={13} />
-                                        Components Detected
+                                        {t('componentsDetected')}
                                     </div>
                                     <div style={styles.componentsList}>
                                         {result.components.map((comp, i) => (
@@ -267,7 +269,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                             <div style={styles.explanationBox}>
                                 <div style={styles.sectionLabel}>
                                     <Sparkles size={13} />
-                                    Analysis
+                                    {t('analysis')}
                                 </div>
                                 <div style={styles.explanationText}>{result.explanation}</div>
                             </div>
@@ -277,7 +279,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                 <div style={styles.codeHeader}>
                                     <div style={styles.sectionLabel}>
                                         <Zap size={13} />
-                                        Generated Code
+                                        {t('generatedCode')}
                                     </div>
                                     <div style={{ display: 'flex', gap: '4px' }}>
                                         <button onClick={handleCopyCode} style={styles.codeActionBtn} title="Copy">
@@ -293,7 +295,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
                                     style={styles.applyBtn}
                                 >
                                     <Sparkles size={14} />
-                                    Apply to Editor
+                                    {t('applyToEditor')}
                                 </button>
                             </div>
                         </div>

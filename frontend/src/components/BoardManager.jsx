@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download, CheckCircle, Cpu, Loader2, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const BoardManager = ({ onClose }) => {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [cores, setCores] = useState([]);
     const [installed, setInstalled] = useState([]);
@@ -41,9 +43,9 @@ const BoardManager = ({ onClose }) => {
         try {
             await axios.post('http://localhost:8001/boards/install', { name: coreID });
             await fetchInstalled();
-            alert(`${coreID} installed successfully!`);
+            alert(`${coreID} ${t('installSuccess')}`);
         } catch (err) {
-            alert(`Failed to install ${coreID}: ${err.response?.data?.detail || err.message}`);
+            alert(`${t('installFailed')} ${coreID}: ${err.response?.data?.detail || err.message}`);
         }
         setInstalling(null);
     };
@@ -58,8 +60,8 @@ const BoardManager = ({ onClose }) => {
         }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Cpu size={18} color="#f85149" />
-                    Board Manager
+                    <span style={{ color: '#f85149' }}><Cpu size={18} /></span>
+                    {t('boardManager')}
                 </h3>
                 <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6e7681', cursor: 'pointer' }}>✕</button>
             </div>
@@ -71,7 +73,7 @@ const BoardManager = ({ onClose }) => {
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                        placeholder="Search boards (esp32, samd, avr)..."
+                        placeholder={t('searchBoards')}
                         style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', flexGrow: 1, fontSize: '13px', padding: '4px 0' }}
                     />
                 </div>
@@ -93,7 +95,7 @@ const BoardManager = ({ onClose }) => {
                                     <span style={{ fontWeight: 600, color: '#c9d1d9', fontSize: '13px' }}>{core.name}</span>
                                     {isInstalled(core.id) ? (
                                         <span style={{ color: '#238636', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                                            <CheckCircle size={12} /> Installed
+                                            <CheckCircle size={12} /> {t('installed')}
                                         </span>
                                     ) : (
                                         <button 
@@ -106,7 +108,7 @@ const BoardManager = ({ onClose }) => {
                                             }}
                                         >
                                             {installing === core.id ? <Loader2 size={10} className="animate-spin" /> : <Download size={10} />}
-                                            Install
+                                            {t('install')}
                                         </button>
                                     )}
                                 </div>
@@ -120,7 +122,7 @@ const BoardManager = ({ onClose }) => {
                     </div>
                 ) : (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#6e7681', fontSize: '12px' }}>
-                        Search for a board core (e.g. "esp32")
+                        {t('searchBoardToBegin')}
                     </div>
                 )}
             </div>

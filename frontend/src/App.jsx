@@ -11,8 +11,10 @@ import BoardManager from './components/BoardManager';
 import VisionPanel from './components/VisionPanel';
 import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 function App() {
+  const { t, i18n } = useTranslation();
   const [code, setCode] = useState('// Welcome to AI Arduino IDE\nvoid setup() {\n  // Put your setup code here, to run once:\n}\n\nvoid loop() {\n  // Put your main code here, to run repeatedly:\n}\n');
   const [logs, setLogs] = useState([]);
   const [board, setBoard] = useState('arduino:avr:uno');
@@ -366,7 +368,7 @@ function App() {
     <div className="flex w-full h-full text-white overflow-hidden">
       <InputModal
         isOpen={modal.isOpen}
-        title={modal.type === 'file' ? 'New File' : 'New Folder'}
+        title={modal.type === 'file' ? t('newFile') : t('newFolder')}
         placeholder={modal.type === 'file' ? 'sketch.ino' : 'lib_name'}
         onConfirm={handleModalConfirm}
         onCancel={closeModal}
@@ -397,16 +399,16 @@ function App() {
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
               onClick={handleCompile}
-              title="Verify Code"
+              title={t('verify')}
             >
-              <CheckCircleIcon size={16} /> Verify
+              <CheckCircleIcon size={16} /> {t('verify')}
             </button>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-gray-700 hover:border-gray-500 rounded text-sm font-medium transition-colors"
               onClick={handleUpload}
-              title="Upload to Arduino"
+              title={t('upload')}
             >
-              <Upload size={16} /> Upload
+              <Upload size={16} /> {t('upload')}
             </button>
           </div>
 
@@ -414,10 +416,10 @@ function App() {
 
           {/* Persistence Controls */}
           <div className="flex items-center gap-1">
-             <button onClick={handleNewSketch} className="p-2 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white" title="New Sketch">
+             <button onClick={handleNewSketch} className="p-2 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white" title={t('newSketch')}>
                 <FilePlus size={18} />
              </button>
-             <button onClick={handleSave} className={`p-2 hover:bg-white/10 rounded transition-colors ${isDirty ? 'text-accent' : 'text-gray-400 hover:text-white'}`} title="Save">
+             <button onClick={handleSave} className={`p-2 hover:bg-white/10 rounded transition-colors ${isDirty ? 'text-accent' : 'text-gray-400 hover:text-white'}`} title={t('save')}>
                 <Save size={18} />
              </button>
           </div>
@@ -434,14 +436,14 @@ function App() {
                 className="bg-transparent text-sm outline-none cursor-pointer"
                 style={{ minWidth: '100px' }}
               >
-                <option value="">Select Port</option>
+                <option value="">{t('selectPort')}</option>
                 {ports.map(p => (
                   <option key={p.path} value={p.path}>{p.path} {p.manufacturer ? `(${p.manufacturer})` : ''}</option>
                 ))}
               </select>
             </div>
 
-            <button onClick={refreshPorts} className="p-1.5 hover:bg-white/10 rounded transition-colors" title="Refresh Ports">
+            <button onClick={refreshPorts} className="p-1.5 hover:bg-white/10 rounded transition-colors" title={t('refreshPorts')}>
               <RefreshCw size={14} className="text-gray-400" />
             </button>
 
@@ -453,7 +455,7 @@ function App() {
                 }`}
             >
               <PlugZap size={14} />
-              {isConnected ? 'Disconnect' : 'Connect'}
+              {isConnected ? t('disconnect') : t('connect')}
             </button>
           </div>
 
@@ -461,8 +463,8 @@ function App() {
 
           {/* File Status */}
           <div className="flex items-center gap-2 px-3">
-             <span className="text-xs text-gray-400 italic">
-                {currentFile ? currentFile.name : 'Unsaved Sketch'}
+              <span className="text-xs text-gray-400 italic">
+                {currentFile ? currentFile.name : t('unsavedSketch')}
                 {isDirty ? '*' : ''}
              </span>
           </div>
@@ -471,7 +473,7 @@ function App() {
 
           {/* Board Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">Board:</span>
+            <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">{t('board')}</span>
             <select
               value={board}
               onChange={e => setBoard(e.target.value)}
@@ -481,6 +483,20 @@ function App() {
               {allBoards.map(b => (
                 <option key={b.fqbn} value={b.fqbn}>{b.name}</option>
               ))}
+            </select>
+          </div>
+
+          <div className="h-6 w-px bg-gray-700"></div>
+
+          {/* Language Switcher */}
+          <div className="flex items-center gap-2 px-3">
+            <select
+              value={i18n.language}
+              onChange={e => i18n.changeLanguage(e.target.value)}
+              className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs outline-none hover:border-gray-500 transition-colors"
+            >
+              <option value="en">EN</option>
+              <option value="fr">FR</option>
             </select>
           </div>
         </div>
@@ -498,19 +514,19 @@ function App() {
               onClick={() => setActiveTab('terminal')}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all border-b-2 ${activeTab === 'terminal' ? 'text-blue-400 border-blue-400' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
             >
-              <TerminalIcon size={14} /> Output
+              <TerminalIcon size={14} /> {t('output')}
             </button>
             <button
               onClick={() => setActiveTab('serial')}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all border-b-2 ${activeTab === 'serial' ? 'text-blue-400 border-blue-400' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
             >
-              <ListFilter size={14} /> Serial Monitor
+              <ListFilter size={14} /> {t('serialMonitor')}
             </button>
             <button
               onClick={() => setActiveTab('plotter')}
               className={`px-4 py-2 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all border-b-2 ${activeTab === 'plotter' ? 'text-blue-400 border-blue-400' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
             >
-              <Activity size={14} /> Plotter
+              <Activity size={14} /> {t('plotter')}
             </button>
           </div>
 

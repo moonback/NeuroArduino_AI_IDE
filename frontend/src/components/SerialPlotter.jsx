@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Activity, Trash2, Maximize2, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const SerialPlotter = ({ logs, onClear }) => {
+    const { t } = useTranslation();
     const canvasRef = useRef(null);
     const [dataPoints, setDataPoints] = useState([]);
     const [maxPoints, setMaxPoints] = useState(100);
@@ -100,12 +102,12 @@ const SerialPlotter = ({ logs, onClear }) => {
             <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] select-none">
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <Activity size={14} color="#58a6ff" />
-                    <span>Serial Plotter</span>
+                    <span>{t('serialPlotter')}</span>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-gray-500">Points:</span>
+                        <span className="text-[10px] text-gray-500">{t('points')}</span>
                         <select 
                             value={maxPoints} 
                             onChange={e => setMaxPoints(Number(e.target.value))}

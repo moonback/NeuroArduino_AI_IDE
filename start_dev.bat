@@ -1,6 +1,6 @@
 @echo off
 echo ==========================================
-echo   Starting AI Arduino IDE
+echo   Starting AI NeuroArduino IDE
 echo ==========================================
 
 cd /d "%~dp0"
