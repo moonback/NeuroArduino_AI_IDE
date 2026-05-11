@@ -348,7 +348,8 @@ const styles = {
         animation: 'fadeIn 0.2s ease',
     },
     panel: {
-        width: '520px',
+        width: '90%',
+        maxWidth: '520px',
         maxHeight: '85vh',
         background: 'linear-gradient(145deg, #131920 0%, #0d1117 100%)',
         border: '1px solid #30363d',

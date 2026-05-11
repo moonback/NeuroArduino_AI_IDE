@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder, onToggleLibraryManager, onToggleBoardManager, onToggleVisionPanel }) => {
     const { t } = useTranslation();
     return (
-        <div style={{ width: '250px', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
+        <div className="panel-sidebar" style={{ width: '250px', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
             {/* Header */}
             <div style={{ padding: '8px 12px', background: '#111b27', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, letterSpacing: '0.5px', color: '#8b9bb4' }}>{t('explorer')}</span>

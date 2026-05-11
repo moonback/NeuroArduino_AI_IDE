@@ -42,7 +42,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
     };
 
     return (
-        <div style={{ width: '350px', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
+        <div className="panel-ai" style={{ width: '350px', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
             {/* Header */}
             <div style={{ 
                 padding: '12px', 

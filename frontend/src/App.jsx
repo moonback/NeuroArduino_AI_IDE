@@ -9,16 +9,18 @@ import InputModal from './components/InputModal';
 import LibraryManager from './components/LibraryManager';
 import BoardManager from './components/BoardManager';
 import VisionPanel from './components/VisionPanel';
-import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera } from 'lucide-react';
+import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera, Sparkles } from 'lucide-react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 
 function App() {
   const { t, i18n } = useTranslation();
-  const [code, setCode] = useState('// Welcome to AI Arduino IDE\nvoid setup() {\n  // Put your setup code here, to run once:\n}\n\nvoid loop() {\n  // Put your main code here, to run repeatedly:\n}\n');
+  const [code, setCode] = useState('// Welcome to AI NeuroArduino IDE\nvoid setup() {\n  // Put your setup code here, to run once:\n}\n\nvoid loop() {\n  // Put your main code here, to run repeatedly:\n}\n');
   const [logs, setLogs] = useState([]);
   const [board, setBoard] = useState('arduino:avr:uno');
   const [activeTab, setActiveTab] = useState('terminal'); // 'terminal', 'serial', or 'plotter'
+  const [showSidebar, setShowSidebar] = useState(true);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   // File System State
   const [fileTree, setFileTree] = useState(null);
@@ -54,9 +56,9 @@ function App() {
   // Monitor changes for dirty state
   useEffect(() => {
     if (code !== initialCodeRef.current) {
-        setIsDirty(true);
+      setIsDirty(true);
     } else {
-        setIsDirty(false);
+      setIsDirty(false);
     }
   }, [code]);
 
@@ -375,16 +377,18 @@ function App() {
       />
 
       {/* Left Sidebar */}
-      <Sidebar
-        fileTree={fileTree}
-        onOpenFolder={handleOpenFolder}
-        onFileClick={handleFileClick}
-        onCreateFile={handleCreateFileClick}
-        onCreateFolder={handleCreateFolderClick}
-        onToggleLibraryManager={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
-        onToggleBoardManager={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
-        onToggleVisionPanel={() => { setShowVisionPanel(true); }}
-      />
+      {showSidebar && (
+        <Sidebar
+          fileTree={fileTree}
+          onOpenFolder={handleOpenFolder}
+          onFileClick={handleFileClick}
+          onCreateFile={handleCreateFileClick}
+          onCreateFolder={handleCreateFolderClick}
+          onToggleLibraryManager={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
+          onToggleBoardManager={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
+          onToggleVisionPanel={() => { setShowVisionPanel(true); }}
+        />
+      )}
 
       {showLibraryManager && <LibraryManager onClose={() => setShowLibraryManager(false)} />}
       {showBoardManager && <BoardManager onClose={() => setShowBoardManager(false)} />}
@@ -394,21 +398,31 @@ function App() {
       <div className="flex flex-col grow min-w-0" style={{ background: '#0b0f14' }}>
 
         {/* Toolbar */}
-        <div style={{ height: '52px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', padding: '0 16px', gap: '16px', background: '#161b22', zIndex: 10 }}>
+        <div style={{ minHeight: '52px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '16px', background: '#161b22', zIndex: 10, flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => setShowSidebar(!showSidebar)}
+            className={`p-2 rounded transition-colors ${showSidebar ? 'text-accent' : 'text-gray-400'}`}
+            title={t('explorer')}
+          >
+            <ListFilter size={18} />
+          </button>
+
+          <div className="h-6 w-px bg-gray-700"></div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
-              onClick={handleCompile}
+               onClick={handleCompile}
               title={t('verify')}
             >
-              <CheckCircleIcon size={16} /> {t('verify')}
+              <CheckCircleIcon size={16} /> <span className="hide-mobile">{t('verify')}</span>
             </button>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-gray-700 hover:border-gray-500 rounded text-sm font-medium transition-colors"
               onClick={handleUpload}
               title={t('upload')}
             >
-              <Upload size={16} /> {t('upload')}
+              <Upload size={16} /> <span className="hide-mobile">{t('upload')}</span>
             </button>
           </div>
 
@@ -416,12 +430,12 @@ function App() {
 
           {/* Persistence Controls */}
           <div className="flex items-center gap-1">
-             <button onClick={handleNewSketch} className="p-2 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white" title={t('newSketch')}>
-                <FilePlus size={18} />
-             </button>
-             <button onClick={handleSave} className={`p-2 hover:bg-white/10 rounded transition-colors ${isDirty ? 'text-accent' : 'text-gray-400 hover:text-white'}`} title={t('save')}>
-                <Save size={18} />
-             </button>
+            <button onClick={handleNewSketch} className="p-2 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white" title={t('newSketch')}>
+              <FilePlus size={18} />
+            </button>
+            <button onClick={handleSave} className={`p-2 hover:bg-white/10 rounded transition-colors ${isDirty ? 'text-accent' : 'text-gray-400 hover:text-white'}`} title={t('save')}>
+              <Save size={18} />
+            </button>
           </div>
 
           <div className="h-6 w-px bg-gray-700"></div>
@@ -450,23 +464,23 @@ function App() {
             <button
               onClick={handleConnect}
               className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${isConnected
-                  ? 'bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20'
-                  : 'bg-green-500/10 text-green-500 border border-green-500/50 hover:bg-green-500/20'
+                ? 'bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20'
+                : 'bg-green-500/10 text-green-500 border border-green-500/50 hover:bg-green-500/20'
                 }`}
             >
               <PlugZap size={14} />
-              {isConnected ? t('disconnect') : t('connect')}
+              <span className="hide-tablet">{isConnected ? t('disconnect') : t('connect')}</span>
             </button>
           </div>
 
           <div style={{ flexGrow: 1 }}></div>
 
           {/* File Status */}
-          <div className="flex items-center gap-2 px-3">
-              <span className="text-xs text-gray-400 italic">
-                {currentFile ? currentFile.name : t('unsavedSketch')}
-                {isDirty ? '*' : ''}
-             </span>
+          <div className="flex items-center gap-2 px-3 hide-tablet">
+            <span className="text-xs text-gray-400 italic">
+              {currentFile ? currentFile.name : t('unsavedSketch')}
+              {isDirty ? '*' : ''}
+            </span>
           </div>
 
           <div style={{ flexGrow: 1 }}></div>
@@ -499,6 +513,16 @@ function App() {
               <option value="fr">FR</option>
             </select>
           </div>
+
+          <div className="h-6 w-px bg-gray-700"></div>
+          
+          <button 
+            onClick={() => setShowAIPanel(!showAIPanel)}
+            className={`p-2 rounded transition-colors ${showAIPanel ? 'text-accent' : 'text-gray-400'}`}
+            title={t('aiAssistant')}
+          >
+            <Sparkles size={18} />
+          </button>
         </div>
 
         {/* Editor Area */}
@@ -507,7 +531,7 @@ function App() {
         </div>
 
         {/* Tabbed Bottom Panel */}
-        <div style={{ height: '240px', borderTop: '1px solid #30363d', display: 'flex', flexDirection: 'column', background: '#0d1117' }}>
+        <div style={{ flexBasis: '200px', minHeight: '150px', borderTop: '1px solid #30363d', display: 'flex', flexDirection: 'column', background: '#0d1117' }}>
           {/* Tab Header */}
           <div className="flex items-center px-4 bg-[#161b22] border-b border-[#30363d]">
             <button
@@ -566,7 +590,7 @@ function App() {
       </div>
 
       {/* Right AI Panel */}
-      <AIPanel onApplyCode={onCodeChange} onOpenVision={() => setShowVisionPanel(true)} />
+      {showAIPanel && <AIPanel onApplyCode={onCodeChange} onOpenVision={() => setShowVisionPanel(true)} />}
     </div>
   );
 }

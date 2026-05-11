@@ -38,7 +38,9 @@ const Terminal = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnected })
                 color: '#8b949e',
                 fontSize: '11px',
                 textTransform: 'uppercase',
-                letterSpacing: '0.05em'
+                letterSpacing: '0.05em',
+                flexWrap: 'wrap',
+                gap: '8px'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span>{t('serialMonitor')}</span>

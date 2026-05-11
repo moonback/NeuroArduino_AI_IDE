@@ -99,7 +99,7 @@ const SerialPlotter = ({ logs, onClear }) => {
 
     return (
         <div className="flex flex-col h-full w-full bg-[#0d1117] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] select-none">
+            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] select-none flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <Activity size={14} color="#58a6ff" />
                     <span>{t('serialPlotter')}</span>

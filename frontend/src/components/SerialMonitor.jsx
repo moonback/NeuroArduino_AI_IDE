@@ -23,7 +23,7 @@ const SerialMonitor = ({ logs, onSend, onClear, baudRate, setBaudRate, isConnect
     return (
         <div className="flex flex-col h-full w-full bg-[#0d1117] font-mono text-sm overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] select-none">
+            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] select-none flex-wrap gap-2">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                         <Wifi size={14} className={isConnected ? "text-green-500" : "text-gray-600"} />

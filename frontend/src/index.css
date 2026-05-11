@@ -232,6 +232,19 @@ button {
   box-shadow: 0 0 15px var(--accent-glow);
 }
 
+@media (max-width: 1024px) {
+  .hide-tablet { display: none !important; }
+  .panel-sidebar { width: 200px !important; }
+  .panel-ai { width: 300px !important; }
+}
+
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .panel-sidebar { display: none !important; }
+  .panel-ai { display: none !important; }
+  .flex-wrap-mobile { flex-wrap: wrap; }
+}
+
 .panel {
   background: var(--bg-panel);
   border: 1px solid var(--border);
