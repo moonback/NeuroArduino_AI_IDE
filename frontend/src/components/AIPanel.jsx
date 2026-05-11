@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Cpu, Sparkles, Camera } from 'lucide-react';
+import { Send, Cpu, Sparkles, Camera, ChevronRight, ChevronLeft } from 'lucide-react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,7 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
         { role: 'assistant', content: t('aiGreeting') }
     ]);
     const [loading, setLoading] = useState(false);
+    const [isMinimized, setIsMinimized] = useState(false);
 
     const sendMessage = async () => {
         if (!input.trim()) return;
@@ -42,113 +43,127 @@ const AIPanel = ({ onApplyCode, onOpenVision }) => {
     };
 
     return (
-        <div className="panel-ai" style={{ width: '350px', borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
-            {/* Header */}
-            <div style={{ 
-                padding: '12px', 
-                borderBottom: '1px solid var(--border)', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between' 
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
-                    <Cpu size={16} color="var(--accent)" />
-                    <span>{t('aiAssistant')}</span>
-                </div>
-                
-                {/* Provider Selector */}
-                <select 
-                    value={provider} 
-                    onChange={(e) => setProvider(e.target.value)}
-                    style={{ 
-                        background: '#21262d', 
-                        color: 'var(--text-primary)', 
-                        border: '1px solid var(--border)', 
-                        borderRadius: '4px', 
-                        fontSize: '11px',
-                        padding: '2px 4px',
-                        outline: 'none',
-                        cursor: 'pointer'
-                    }}
-                >
-                    <option value="groq">Groq (Llama 3)</option>
-                    <option value="gemini">Gemini 2.5 Flash</option>
-                </select>
-            </div>
+        <div className={`ai-panel ${isMinimized ? 'ai-panel-minimized' : ''}`}>
+            {/* Minimize Toggle Button */}
+            <button 
+                className="ai-panel-toggle"
+                onClick={() => setIsMinimized(!isMinimized)}
+                title={isMinimized ? 'Expand AI Assistant' : 'Minimize AI Assistant'}
+            >
+                {isMinimized ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+            </button>
 
-            {/* Messages */}
-            <div style={{ flexGrow: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {messages.map((msg, i) => (
-                    <div key={i} style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
-
-                        <div style={{
-                            background: msg.role === 'user' ? 'var(--accent)' : '#21262d',
-                            color: msg.role === 'user' ? '#000' : 'var(--text-primary)',
-                            padding: '10px', borderRadius: '8px', fontSize: '14px', lineHeight: '1.4',
-                            boxShadow: msg.role === 'user' ? '0 2px 10px rgba(0, 212, 255, 0.2)' : 'none'
-                        }}>
-                            {msg.content}
+            {!isMinimized && (
+                <>
+                    {/* Header */}
+                    <div className="ai-panel-header">
+                        <div className="ai-panel-title">
+                            <Sparkles size={18} className="ai-icon-glow" />
+                            <span>{t('aiAssistant')}</span>
                         </div>
+                        
+                        {/* Provider Selector */}
+                        <div className="ai-provider-selector">
+                            <span className="provider-label">Model:</span>
+                            <select 
+                                value={provider} 
+                                onChange={(e) => setProvider(e.target.value)}
+                                className="provider-select"
+                            >
+                                <option value="groq">Groq Llama 3</option>
+                                <option value="gemini">Gemini 2.5</option>
+                            </select>
+                        </div>
+                    </div>
 
-                        {/* Code Block Option */}
-                        {msg.code && (
-                            <div style={{ marginTop: '8px', background: '#0d1117', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden' }}>
-                                <div style={{ background: '#30363d', padding: '4px 8px', fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Sparkles size={10} color="var(--accent)" />
-                                        <span>Arduino C++</span>
-                                    </div>
-                                    <button onClick={() => onApplyCode(msg.code)} style={{ 
-                                        color: 'var(--accent)', 
-                                        cursor: 'pointer', 
-                                        background: 'none', 
-                                        border: 'none',
-                                        fontSize: '11px',
-                                        fontWeight: 600
-                                    }}>Apply</button>
+                    {/* Messages */}
+                    <div className="ai-messages-container">
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`ai-message ${msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'}`}>
+                                {/* Avatar */}
+                                <div className="ai-message-avatar">
+                                    {msg.role === 'user' ? (
+                                        <div className="avatar-user">U</div>
+                                    ) : (
+                                        <Cpu size={14} className="avatar-ai" />
+                                    )}
                                 </div>
-                                <pre style={{ padding: '8px', fontSize: '12px', overflowX: 'auto', margin: 0 }}>
-                                    <code>{msg.code}</code>
-                                </pre>
+
+                                {/* Content */}
+                                <div className="ai-message-content">
+                                    <div className="ai-message-bubble">
+                                        {msg.content}
+                                    </div>
+
+                                    {/* Code Block */}
+                                    {msg.code && (
+                                        <div className="ai-code-block">
+                                            <div className="ai-code-header">
+                                                <div className="ai-code-label">
+                                                    <Sparkles size={12} className="code-icon" />
+                                                    <span>Arduino C++</span>
+                                                </div>
+                                                <button 
+                                                    onClick={() => onApplyCode(msg.code)} 
+                                                    className="ai-code-apply-btn"
+                                                >
+                                                    Apply to Editor
+                                                </button>
+                                            </div>
+                                            <pre className="ai-code-content">
+                                                <code>{msg.code}</code>
+                                            </pre>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {loading && (
+                            <div className="ai-loading">
+                                <div className="ai-loading-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                                <span className="ai-loading-text">
+                                    {provider === 'groq' ? 'Groq' : 'Gemini'} is thinking...
+                                </span>
                             </div>
                         )}
                     </div>
-                ))}
-                {loading && <div style={{ opacity: 0.5, fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div className="pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }}></div>
-                    Thinking with {provider === 'groq' ? 'Groq' : 'Gemini'}...
-                </div>}
-            </div>
 
-            {/* Input */}
-            <div style={{ padding: '10px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-input)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                    <input
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                        placeholder={`Ask ${provider === 'groq' ? 'Groq' : 'Gemini'} to blink an LED...`}
-                        style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', flexGrow: 1, fontSize: '14px' }}
-                    />
-                    <button onClick={onOpenVision} title="Vision-to-Wire" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
-                        <Camera size={16} color="#a78bfa" />
-                    </button>
-                    <button onClick={sendMessage} title="Send" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                        <Send size={16} color="var(--accent)" />
-                    </button>
-                </div>
-            </div>
-            
-            <style>{`
-                .pulse {
-                    animation: pulse-animation 1.5s infinite ease-in-out;
-                }
-                @keyframes pulse-animation {
-                    0% { transform: scale(0.95); opacity: 0.5; }
-                    50% { transform: scale(1.1); opacity: 1; }
-                    100% { transform: scale(0.95); opacity: 0.5; }
-                }
-            `}</style>
+                    {/* Input */}
+                    <div className="ai-input-container">
+                        <div className="ai-input-wrapper">
+                            <input
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                                placeholder={`Ask ${provider === 'groq' ? 'Groq' : 'Gemini'} anything...`}
+                                className="ai-input"
+                            />
+                            <div className="ai-input-actions">
+                                <button 
+                                    onClick={onOpenVision} 
+                                    className="ai-input-btn ai-vision-btn" 
+                                    title="Vision-to-Wire"
+                                >
+                                    <Camera size={16} />
+                                </button>
+                                <button 
+                                    onClick={sendMessage} 
+                                    className="ai-input-btn ai-send-btn" 
+                                    title="Send"
+                                    disabled={!input.trim()}
+                                >
+                                    <Send size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };

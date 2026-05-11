@@ -9,7 +9,8 @@ import InputModal from './components/InputModal';
 import LibraryManager from './components/LibraryManager';
 import BoardManager from './components/BoardManager';
 import VisionPanel from './components/VisionPanel';
-import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera, Sparkles } from 'lucide-react';
+import Settings from './components/Settings';
+import { Play, Upload, Settings as SettingsIcon, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera, Sparkles } from 'lucide-react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +40,7 @@ function App() {
   const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showBoardManager, setShowBoardManager] = useState(false);
   const [showVisionPanel, setShowVisionPanel] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [allBoards, setAllBoards] = useState([
     { name: 'Arduino Uno', fqbn: 'arduino:avr:uno' },
     { name: 'Arduino Nano', fqbn: 'arduino:avr:nano' },
@@ -367,7 +369,7 @@ function App() {
   };
 
   return (
-    <div className="flex w-full h-full text-white overflow-hidden">
+    <div className="app-container">
       <InputModal
         isOpen={modal.isOpen}
         title={modal.type === 'file' ? t('newFile') : t('newFolder')}
@@ -377,41 +379,42 @@ function App() {
       />
 
       {/* Activity Bar */}
-      <div style={{ width: '48px', minWidth: '48px', background: '#111b27', borderRight: '1px solid #30363d', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: '16px', zIndex: 20 }}>
+      <div className="activity-bar">
         <button 
           onClick={() => setShowSidebar(!showSidebar)}
-          className={`p-2 rounded transition-colors ${showSidebar ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          className={`activity-btn ${showSidebar ? 'activity-btn-active' : ''}`}
           title={t('explorer')}
         >
           <ListFilter size={20} />
         </button>
         <button 
           onClick={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
-          className={`p-2 rounded transition-colors ${showBoardManager ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          className={`activity-btn ${showBoardManager ? 'activity-btn-active' : ''}`}
           title={t('boards')}
         >
           <Cpu size={20} />
         </button>
         <button 
           onClick={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
-          className={`p-2 rounded transition-colors ${showLibraryManager ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+          className={`activity-btn ${showLibraryManager ? 'activity-btn-active' : ''}`}
           title={t('libraries')}
         >
           <Package size={20} />
         </button>
         <button 
           onClick={() => setShowVisionPanel(true)}
-          className="p-2 rounded text-gray-500 hover:text-cyan-400 transition-colors"
+          className="activity-btn"
           title={t('vision')}
         >
           <Camera size={20} />
         </button>
         <div style={{ flexGrow: 1 }}></div>
         <button 
-          className="p-2 rounded text-gray-500 hover:text-gray-300 transition-colors"
+          onClick={() => setShowSettings(true)}
+          className="activity-btn"
           title={t('settings') || "Settings"}
         >
-          <Settings size={20} />
+          <SettingsIcon size={20} />
         </button>
       </div>
 
@@ -429,135 +432,133 @@ function App() {
       {showLibraryManager && <LibraryManager onClose={() => setShowLibraryManager(false)} />}
       {showBoardManager && <BoardManager onClose={() => setShowBoardManager(false)} />}
       {showVisionPanel && <VisionPanel onApplyCode={onCodeChange} onClose={() => setShowVisionPanel(false)} />}
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
 
       {/* Main Content */}
-      <div className="flex flex-col grow min-w-0" style={{ background: '#0b0f14' }}>
+      <div className="main-content">
 
         {/* Toolbar */}
-        <div style={{ minHeight: '44px', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', padding: '8px 16px', gap: '12px', background: '#161b22', zIndex: 10, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-colors"
-               onClick={handleCompile}
-              title={t('verify')}
-            >
-              <CheckCircleIcon size={16} /> <span className="hide-mobile">{t('verify')}</span>
-            </button>
-            <button
-              className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-gray-700 hover:border-gray-500 rounded text-sm font-medium transition-colors"
-              onClick={handleUpload}
-              title={t('upload')}
-            >
-              <Upload size={16} /> <span className="hide-mobile">{t('upload')}</span>
-            </button>
-          </div>
+        <div className="toolbar-header">
+          {/* Left Section - App Title & Actions */}
+          <div className="toolbar-section">
+            
+            
+            <div className="toolbar-divider"></div>
+            
+            {/* File Actions */}
+            <div className="toolbar-group">
+              <button onClick={handleNewSketch} className="toolbar-btn" title={t('newSketch')}>
+                <FilePlus size={16} />
+              </button>
+              <button onClick={handleSave} className={`toolbar-btn ${isDirty ? 'toolbar-btn-accent' : ''}`} title={t('save')}>
+                <Save size={16} />
+              </button>
+            </div>
 
-          <div className="h-6 w-px bg-gray-700"></div>
+            <div className="toolbar-divider"></div>
 
-          {/* Persistence Controls */}
-          <div className="flex items-center gap-1">
-            <button onClick={handleNewSketch} className="p-2 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white" title={t('newSketch')}>
-              <FilePlus size={18} />
-            </button>
-            <button onClick={handleSave} className={`p-2 hover:bg-white/10 rounded transition-colors ${isDirty ? 'text-accent' : 'text-gray-400 hover:text-white'}`} title={t('save')}>
-              <Save size={18} />
-            </button>
-          </div>
-
-          <div className="h-6 w-px bg-gray-700"></div>
-
-          {/* Hardware Controls */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#0d1117] border border-[#30363d] rounded px-2 py-1">
-              <Cpu size={14} className="text-gray-400" />
-              <select
-                value={selectedPort}
-                onChange={e => setSelectedPort(e.target.value)}
-                className="bg-transparent text-sm outline-none cursor-pointer"
-                style={{ minWidth: '100px' }}
+            {/* Build Actions */}
+            <div className="toolbar-group">
+              <button
+                className="toolbar-btn-primary"
+                onClick={handleCompile}
+                title={t('verify')}
               >
-                <option value="">{t('selectPort')}</option>
-                {ports.map(p => (
-                  <option key={p.path} value={p.path}>{p.path} {p.manufacturer ? `(${p.manufacturer})` : ''}</option>
+                <CheckCircleIcon size={16} /> 
+                <span className="hide-mobile">{t('verify')}</span>
+              </button>
+              <button
+                className="toolbar-btn-secondary"
+                onClick={handleUpload}
+                title={t('upload')}
+              >
+                <Upload size={16} /> 
+                <span className="hide-mobile">{t('upload')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Center Section - File Status */}
+          <div className="toolbar-section toolbar-center hide-tablet">
+            <div className="file-status">
+              <span className="file-name">
+                {currentFile ? currentFile.name : t('unsavedSketch')}
+              </span>
+              {isDirty && <span className="file-modified">●</span>}
+            </div>
+          </div>
+
+          {/* Right Section - Hardware & Settings */}
+          <div className="toolbar-section">
+            {/* Hardware Controls */}
+            <div className="toolbar-group">
+              <div className="port-selector">
+                <Cpu size={14} className="text-gray-400" />
+                <select
+                  value={selectedPort}
+                  onChange={e => setSelectedPort(e.target.value)}
+                  className="port-select"
+                >
+                  <option value="">{t('selectPort')}</option>
+                  {ports.map(p => (
+                    <option key={p.path} value={p.path}>
+                      {p.path} {p.manufacturer ? `(${p.manufacturer})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button onClick={refreshPorts} className="toolbar-btn-icon" title={t('refreshPorts')}>
+                <RefreshCw size={14} />
+              </button>
+
+              <button
+                onClick={handleConnect}
+                className={`connect-btn ${isConnected ? 'connect-btn-disconnect' : 'connect-btn-connect'}`}
+              >
+                <PlugZap size={14} />
+                <span className="hide-tablet">{isConnected ? t('disconnect') : t('connect')}</span>
+              </button>
+            </div>
+
+            <div className="toolbar-divider"></div>
+
+            {/* Board Selector */}
+            <div className="toolbar-group">
+              <label className="toolbar-label">{t('board')}</label>
+              <select
+                value={board}
+                onChange={e => setBoard(e.target.value)}
+                className="board-select"
+              >
+                {allBoards.map(b => (
+                  <option key={b.fqbn} value={b.fqbn}>{b.name}</option>
                 ))}
               </select>
             </div>
 
-            <button onClick={refreshPorts} className="p-1.5 hover:bg-white/10 rounded transition-colors" title={t('refreshPorts')}>
-              <RefreshCw size={14} className="text-gray-400" />
-            </button>
+            <div className="toolbar-divider"></div>
 
-            <button
-              onClick={handleConnect}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all ${isConnected
-                ? 'bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500/20'
-                : 'bg-green-500/10 text-green-500 border border-green-500/50 hover:bg-green-500/20'
-                }`}
-            >
-              <PlugZap size={14} />
-              <span className="hide-tablet">{isConnected ? t('disconnect') : t('connect')}</span>
-            </button>
+            {/* AI Toggle */}
+            <div className="toolbar-group">
+              <button 
+                onClick={() => setShowAIPanel(!showAIPanel)}
+                className={`toolbar-btn-icon ${showAIPanel ? 'toolbar-btn-active' : ''}`}
+                title={t('aiAssistant')}
+              >
+                <Sparkles size={18} />
+              </button>
+            </div>
           </div>
-
-          <div style={{ flexGrow: 1 }}></div>
-
-          {/* File Status */}
-          <div className="flex items-center gap-2 px-3 hide-tablet">
-            <span className="text-xs text-gray-400 italic">
-              {currentFile ? currentFile.name : t('unsavedSketch')}
-              {isDirty ? '*' : ''}
-            </span>
-          </div>
-
-          <div style={{ flexGrow: 1 }}></div>
-
-          {/* Board Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 uppercase tracking-wider font-bold">{t('board')}</span>
-            <select
-              value={board}
-              onChange={e => setBoard(e.target.value)}
-              className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-sm outline-none hover:border-gray-500 transition-colors"
-              style={{ maxWidth: '200px' }}
-            >
-              {allBoards.map(b => (
-                <option key={b.fqbn} value={b.fqbn}>{b.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="h-6 w-px bg-gray-700"></div>
-
-          {/* Language Switcher */}
-          <div className="flex items-center gap-2 px-3">
-            <select
-              value={i18n.language}
-              onChange={e => i18n.changeLanguage(e.target.value)}
-              className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-xs outline-none hover:border-gray-500 transition-colors"
-            >
-              <option value="en">EN</option>
-              <option value="fr">FR</option>
-            </select>
-          </div>
-
-          <div className="h-6 w-px bg-gray-700"></div>
-          
-          <button 
-            onClick={() => setShowAIPanel(!showAIPanel)}
-            className={`p-2 rounded transition-colors ${showAIPanel ? 'text-accent' : 'text-gray-400'}`}
-            title={t('aiAssistant')}
-          >
-            <Sparkles size={18} />
-          </button>
         </div>
 
         {/* Editor Area */}
-        <div style={{ flexGrow: 1, position: 'relative' }}>
+        <div className="editor-area">
           <CodeEditor code={code} setCode={onCodeChange} />
         </div>
 
         {/* Tabbed Bottom Panel */}
-        <div style={{ flexBasis: '200px', minHeight: '150px', borderTop: '1px solid #30363d', display: 'flex', flexDirection: 'column', background: '#0d1117' }}>
+        <div className="bottom-panel">
           {/* Tab Header */}
           <div className="flex items-center px-4 bg-[#161b22] border-b border-[#30363d]">
             <button
