@@ -35,6 +35,8 @@ class CodeGeneratorAgent:
         self.groq_api_key = os.getenv("GROQ_API_KEY")
         if self.groq_api_key:
             self.groq_client = Groq(api_key=self.groq_api_key)
+            # Use llama-3.3-70b-versatile (latest available model)
+            # Note: Function calling support varies by model
             self.groq_model = "llama-3.3-70b-versatile"
         else:
             self.groq_client = None
@@ -84,6 +86,9 @@ class CodeGeneratorAgent:
                 if enable_tools:
                     # Try with function calling
                     try:
+                        print(f"[DEBUG] Calling Groq with tools enabled")
+                        print(f"[DEBUG] Number of tools available: {len(self.tool_registry.get_tool_definitions())}")
+                        
                         completion = self.groq_client.chat.completions.create(
                             messages=messages,
                             model=self.groq_model,
@@ -93,8 +98,11 @@ class CodeGeneratorAgent:
                         
                         response_message = completion.choices[0].message
                         
+                        print(f"[DEBUG] Response has tool_calls: {hasattr(response_message, 'tool_calls') and response_message.tool_calls is not None}")
+                        
                         # Check if AI wants to use tools
                         if response_message.tool_calls:
+                            print(f"[DEBUG] AI wants to use {len(response_message.tool_calls)} tool(s)")
                             tool_calls = []
                             tool_results = []
                             
@@ -102,8 +110,13 @@ class CodeGeneratorAgent:
                                 tool_name = tool_call.function.name
                                 tool_params = json.loads(tool_call.function.arguments)
                                 
+                                print(f"[DEBUG] Executing tool: {tool_name}")
+                                print(f"[DEBUG] Parameters: {tool_params}")
+                                
                                 # Execute tool
                                 result = self.tool_registry.execute_tool(tool_name, tool_params)
+                                
+                                print(f"[DEBUG] Tool result: {result.get('status', 'unknown')}")
                                 
                                 tool_calls.append({
                                     "id": tool_call.id,
@@ -124,6 +137,7 @@ class CodeGeneratorAgent:
                                 "code": None
                             }
                         else:
+                            print(f"[DEBUG] No tool calls, returning regular response")
                             # No tool calls, just return the message
                             content = response_message.content
                             code = self._extract_code(content)
@@ -136,13 +150,35 @@ class CodeGeneratorAgent:
                     
                     except Exception as e:
                         # Fallback to regular completion if function calling fails
-                        print(f"Function calling failed, falling back: {e}")
+                        print(f"[DEBUG] Function calling failed: {e}")
+                        print(f"[DEBUG] Attempting manual tool parsing fallback")
                         completion = self.groq_client.chat.completions.create(
                             messages=messages,
                             model=self.groq_model,
                         )
                         content = completion.choices[0].message.content
-                        return self._parse_response_with_tools(content)
+                        
+                        # Try to parse manual tool calls from response
+                        result = self._parse_response_with_tools(content)
+                        
+                        # If no tools were found but we have a current file context, force tool usage
+                        if not result.get('tool_calls') and enable_tools:
+                            # Check if this looks like a modification request
+                            if any(keyword in prompt.lower() for keyword in ['change', 'modify', 'update', 'improve', 'fix', 'add', 'refactor']):
+                                if '[CURRENT FILE:' in prompt:
+                                    print(f"[DEBUG] Detected modification request without tool call - forcing smart_modify_file")
+                                    # Extract file path from context
+                                    import re
+                                    file_match = re.search(r"\[CURRENT FILE: '([^']+)' at '([^']+)'\]", prompt)
+                                    if file_match:
+                                        file_name = file_match.group(1)
+                                        file_path = file_match.group(2)
+                                        
+                                        # Try to extract what needs to be changed from the AI's response
+                                        print(f"[WARNING] AI did not use tools. Response: {content[:200]}")
+                                        result['message'] = "⚠️ I generated a response but didn't use the file modification tools. Please try rephrasing your request, or I can show you the code to manually apply."
+                        
+                        return result
                 else:
                     # Tools disabled, regular generation
                     completion = self.groq_client.chat.completions.create(
@@ -167,24 +203,125 @@ class CodeGeneratorAgent:
                     "tool_results": []
                 }
 
-        # 2. Gemini Provider
+        # 2. Gemini Provider (with native function calling support)
         elif provider == "gemini" and self.gemini_model:
             try:
-                # Gemini chat history format
-                chat_history = []
-                for msg in history:
-                    role = "user" if msg.get("role") == "user" else "model"
-                    chat_history.append({"role": role, "parts": [msg.get("content", "")]})
-                
-                chat = self.gemini_model.start_chat(history=chat_history)
-                response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
-                content = response.text
-                
-                # Parse response for tool calls
-                return self._parse_response_with_tools(content)
+                # Gemini supports native function calling
+                if enable_tools:
+                    # Convert tool definitions to Gemini format
+                    # Gemini expects a list of function declarations
+                    from google.generativeai.types import FunctionDeclaration, Tool
+                    
+                    gemini_functions = []
+                    for tool_def in self.tool_registry.get_tool_definitions():
+                        func = tool_def["function"]
+                        
+                        # Clean parameters - remove "default" fields that Gemini doesn't support
+                        clean_params = self._clean_params_for_gemini(func["parameters"])
+                        
+                        gemini_functions.append(
+                            FunctionDeclaration(
+                                name=func["name"],
+                                description=func["description"],
+                                parameters=clean_params
+                            )
+                        )
+                    
+                    gemini_tool = Tool(function_declarations=gemini_functions)
+                    
+                    print(f"[DEBUG] Calling Gemini with {len(gemini_functions)} tools")
+                    
+                    # Create model with tools
+                    model_with_tools = genai.GenerativeModel(
+                        "gemini-2.0-flash-exp",
+                        tools=[gemini_tool]
+                    )
+                    
+                    # Build chat history
+                    chat_history = []
+                    for msg in history:
+                        role = "user" if msg.get("role") == "user" else "model"
+                        chat_history.append({"role": role, "parts": [msg.get("content", "")]})
+                    
+                    chat = model_with_tools.start_chat(history=chat_history)
+                    response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
+                    
+                    # Check if Gemini wants to use tools
+                    if response.candidates[0].content.parts:
+                        tool_calls = []
+                        tool_results = []
+                        
+                        for part in response.candidates[0].content.parts:
+                            if hasattr(part, 'function_call') and part.function_call:
+                                fc = part.function_call
+                                tool_name = fc.name
+                                tool_params = dict(fc.args)
+                                
+                                print(f"[DEBUG] Gemini calling tool: {tool_name}")
+                                print(f"[DEBUG] Parameters: {tool_params}")
+                                
+                                # Execute tool
+                                result = self.tool_registry.execute_tool(tool_name, tool_params)
+                                
+                                print(f"[DEBUG] Tool result: {result.get('status', 'unknown')}")
+                                
+                                tool_calls.append({
+                                    "id": f"gemini_{len(tool_calls)}",
+                                    "tool": tool_name,
+                                    "parameters": tool_params
+                                })
+                                
+                                tool_results.append({
+                                    "id": f"gemini_{len(tool_results)}",
+                                    "tool": tool_name,
+                                    "result": result
+                                })
+                        
+                        if tool_calls:
+                            # Get text response if any
+                            text_response = ""
+                            for part in response.candidates[0].content.parts:
+                                if hasattr(part, 'text') and part.text:
+                                    text_response += part.text
+                            
+                            return {
+                                "message": text_response or "I've executed the requested operations.",
+                                "tool_calls": tool_calls,
+                                "tool_results": tool_results,
+                                "code": None
+                            }
+                    
+                    # No tool calls, regular response
+                    content = response.text
+                    code = self._extract_code(content)
+                    return {
+                        "message": content if not code else self._remove_code_from_message(content),
+                        "code": code,
+                        "tool_calls": [],
+                        "tool_results": []
+                    }
+                else:
+                    # Tools disabled
+                    chat_history = []
+                    for msg in history:
+                        role = "user" if msg.get("role") == "user" else "model"
+                        chat_history.append({"role": role, "parts": [msg.get("content", "")]})
+                    
+                    chat = self.gemini_model.start_chat(history=chat_history)
+                    response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
+                    content = response.text
+                    code = self._extract_code(content)
+                    return {
+                        "message": content if not code else self._remove_code_from_message(content),
+                        "code": code,
+                        "tool_calls": [],
+                        "tool_results": []
+                    }
                 
             except Exception as e:
+                import traceback
                 print(f"Gemini API Error: {e}")
+                print(f"Traceback: {traceback.format_exc()}")
                 return {
                     "message": f"Error: Gemini Generation Failed.\nDetails: {str(e)}",
                     "code": None,
@@ -247,6 +384,24 @@ class CodeGeneratorAgent:
         if code_match:
             return code_match.group(1).strip()
         return None
+    
+    def _clean_params_for_gemini(self, params: dict) -> dict:
+        """Remove fields that Gemini doesn't support (like 'default')"""
+        if not isinstance(params, dict):
+            return params
+        
+        cleaned = {}
+        for key, value in params.items():
+            if key == "default":
+                continue  # Skip default fields
+            elif isinstance(value, dict):
+                cleaned[key] = self._clean_params_for_gemini(value)
+            elif isinstance(value, list):
+                cleaned[key] = [self._clean_params_for_gemini(item) if isinstance(item, dict) else item for item in value]
+            else:
+                cleaned[key] = value
+        
+        return cleaned
     
     def _remove_code_from_message(self, content: str) -> str:
         """Remove code blocks from message"""

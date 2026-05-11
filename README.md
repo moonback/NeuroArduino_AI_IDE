@@ -2,7 +2,8 @@
 
 [![Download](https://img.shields.io/badge/Télécharger-Dernière_Version_Windows-blueviolet?style=for-the-badge&logo=windows)](https://github.com/Darshan736/vibe-coding-projects/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-2.0-green.svg?style=for-the-badge)](https://github.com/Darshan736/vibe-coding-projects/releases)
+[![Version](https://img.shields.io/badge/Version-2.1-green.svg?style=for-the-badge)](https://github.com/Darshan736/vibe-coding-projects/releases)
+[![Tool Calling](https://img.shields.io/badge/Tool_Calling-Enabled-orange.svg?style=for-the-badge)](docs/TOOL_CALLING_USER_GUIDE.md)
 
 > **Un IDE Arduino de nouvelle génération propulsé par l'IA**  
 > Développez vos projets Arduino en conversant naturellement avec une intelligence artificielle. Inspiré de Cursor, avec une esthétique "Anti-Gravity" moderne.
@@ -11,10 +12,41 @@
 
 ---
 
+## 🎉 Nouveautés v2.1 - Tool Calling
+
+### 🛠️ L'IA Modifie Vos Fichiers Directement !
+
+**Fini le copier-coller !** L'assistant IA peut maintenant modifier vos fichiers automatiquement :
+
+```
+Vous : "Change le délai à 500ms"
+IA : ✅ Fait ! Tous les delay() sont maintenant à 500ms.
+     [Fichier mis à jour automatiquement dans l'éditeur]
+```
+
+**Nouvelles Capacités** :
+- 🎯 **8 outils puissants** : créer, modifier, lire, supprimer fichiers
+- 🔧 **Modifications intelligentes** : changements précis et ciblés
+- 📁 **Conscience du contexte** : l'IA voit le fichier ouvert
+- ⚡ **Instantané** : pas de clic "Appliquer", tout est automatique
+- 🔒 **Sécurisé** : sandbox du workspace, validation des chemins
+
+**Exemples d'utilisation** :
+- "Améliore mon code" → Refactoring automatique
+- "Ajoute Serial debugging" → Modifications appliquées
+- "Corrige le bug ligne 15" → Bug corrigé instantanément
+- "Change la pin LED de 13 à 9" → Modification précise
+
+[📖 Voir le guide complet](docs/TOOL_CALLING_USER_GUIDE.md)
+
+---
+
 ## ✨ Pourquoi NeuroArduino ?
 
 - 🧠 **Intelligence Artificielle Conversationnelle** : Décrivez ce que vous voulez en langage naturel, l'IA génère le code Arduino
-- 🛡️ **Sécurité Matérielle Intégrée** : Détection automatique des risques (court-circuits, surcharge, conflits de pins)
+- �️ **Tool Calling Avancé** : L'IA modifie vos fichiers directement, sans copier-coller
+- 🎯 **Modifications Intelligentes** : Changements précis et automatiques dans votre code
+- �🛡️ **Sécurité Matérielle Intégrée** : Détection automatique des risques (court-circuits, surcharge, conflits de pins)
 - 📷 **Vision-to-Wire** : Prenez une photo de votre montage, obtenez le code correspondant
 - 🎨 **Interface Moderne** : Design sombre premium avec Monaco Editor (VS Code)
 - 🌍 **Multilingue** : Interface en Français et Anglais
@@ -82,9 +114,11 @@ npm run electron:dev
 
 ## 🌟 Fonctionnalités Principales
 
-### 🧠 Assistant IA Multi-Modèles
+### 🧠 Assistant IA Multi-Modèles avec Tool Calling
 
-Choisissez entre **Groq (Llama 3.3 70B)** ou **Gemini 2.5 Flash** pour générer votre code :
+Choisissez entre **Groq (Llama 3.3 70B)** ou **Gemini 2.0 Flash** pour générer votre code :
+
+#### 🎯 Génération de Code Classique
 
 ```
 Vous : "Fais clignoter une LED sur la pin 13 toutes les 500ms"
@@ -103,15 +137,88 @@ void loop() {
 }
 ```
 
+#### 🛠️ **NOUVEAU : Modification Directe de Fichiers (Tool Calling)**
+
+L'IA peut maintenant **modifier vos fichiers directement** sans afficher le code dans la conversation !
+
+```
+Vous : "Change le délai à 500ms"
+
+IA : Je vais mettre à jour les valeurs de délai...
+     🔧 [Utilise smart_modify_file]
+     ✅ Fichier modifié automatiquement dans l'éditeur
+     
+IA : Terminé ! J'ai changé tous les appels delay() à 500ms.
+```
+
+**Plus besoin de :**
+- ❌ Copier/coller le code
+- ❌ Cliquer sur "Appliquer à l'éditeur"
+- ❌ Vérifier manuellement les changements
+
+**Maintenant :**
+- ✅ Modifications automatiques et instantanées
+- ✅ Conversation propre sans blocs de code
+- ✅ Changements précis et ciblés
+
 **Fonctionnalités IA** :
 - 💬 Conversation contextuelle (historique maintenu)
 - 🔄 Itération sur le code existant
 - 🎯 Génération précise et compilable
+- 🛠️ **Modification directe de fichiers (Tool Calling)**
+- 📁 **Conscience du contexte** (voit le fichier ouvert)
+- 🔧 **8 outils disponibles** (créer, modifier, lire, supprimer fichiers)
 - 🌐 Mode offline avec génération basique
 
 ---
 
-### 📷 Vision-to-Wire (Révolutionnaire)
+### �️ Système de Tool Calling Avancé
+
+L'IA dispose de **8 outils puissants** pour interagir avec vos fichiers :
+
+| Outil | Description | Exemple d'utilisation |
+|-------|-------------|----------------------|
+| 🎯 **smart_modify_file** | Modifications intelligentes multi-opérations | "Change le délai et ajoute Serial debugging" |
+| 📄 **create_file** | Créer de nouveaux fichiers | "Crée un fichier config.h avec les constantes" |
+| ✏️ **modify_file** | Modifications simples (remplacer, insérer) | "Ajoute un commentaire en haut du fichier" |
+| 👁️ **read_file** | Lire le contenu d'un fichier | "Lis le fichier utils.h" |
+| 📁 **list_files** | Lister les fichiers du projet | "Quels fichiers .ino sont dans ce projet ?" |
+| 📂 **create_directory** | Créer des dossiers | "Crée un dossier 'libraries'" |
+| 🔄 **rename_file** | Renommer/déplacer des fichiers | "Renomme sketch.ino en blink.ino" |
+| 🗑️ **delete_file** | Supprimer des fichiers | "Supprime old_code.ino" |
+
+**Exemples d'utilisation** :
+
+```
+Vous : "Améliore mon code"
+IA : [Analyse le code, utilise smart_modify_file]
+     - Remplace les nombres magiques par des constantes
+     - Ajoute des commentaires explicatifs
+     - Optimise les boucles
+     ✅ Fichier mis à jour automatiquement
+
+Vous : "Ajoute un bouton sur la pin 2"
+IA : [Utilise smart_modify_file]
+     - Ajoute pinMode(2, INPUT_PULLUP) dans setup()
+     - Ajoute la logique de lecture dans loop()
+     ✅ Modifications appliquées
+
+Vous : "Corrige le bug ligne 15"
+IA : [Analyse le bug, utilise smart_modify_file]
+     - Identifie le problème
+     - Applique la correction
+     ✅ Bug corrigé
+```
+
+**Sécurité** :
+- 🔒 Validation des chemins (pas de traversée de répertoire)
+- 🛡️ Sandbox du workspace
+- ⚠️ Confirmation pour les opérations destructives
+- 📏 Limites de taille de fichier
+
+---
+
+### �📷 Vision-to-Wire (Révolutionnaire)
 
 **Transformez une photo en code** :
 
@@ -251,14 +358,20 @@ Arduino_AI_IDE/
 │   └── package.json
 │
 ├── backend/                  # Serveur FastAPI
-│   ├── agents.py            # Agents IA
+│   ├── agents.py            # Agents IA (avec function calling)
+│   ├── tools_registry.py    # Système de tool calling (8 outils)
+│   ├── system_prompts.py    # Prompts système optimisés
 │   ├── main.py              # API REST
 │   ├── requirements.txt     # Dépendances Python
+│   ├── tests/               # Tests unitaires
+│   │   └── test_smart_modify.py  # Tests tool calling
 │   └── tools/               # Arduino CLI
 │
 ├── docs/                     # Documentation
 │   ├── ARCHITECTURE.md      # Architecture détaillée
 │   ├── ROADMAP.md           # Feuille de route
+│   ├── TOOL_CALLING_USER_GUIDE.md  # Guide tool calling
+│   ├── AI_ASSISTANT_ANALYSIS.md    # Analyse assistant IA
 │   └── UI_IMPROVEMENTS.md   # Améliorations UI
 │
 └── README.md                # Ce fichier
@@ -273,18 +386,22 @@ Arduino_AI_IDE/
 - 🤖 Générer du code par conversation
 - 📷 Analyser des montages existants
 - 🛡️ Éviter les erreurs matérielles
+- 🛠️ **Modifier le code en langage naturel**
 
 ### Pour les Développeurs
 - ⚡ Prototypage rapide
 - 🔄 Itération sur le code
 - 🐛 Debugging avec l'IA
 - 📊 Visualisation des données série
+- 🎯 **Modifications précises avec tool calling**
+- 🔧 **Refactoring automatique**
 
 ### Pour les Éducateurs
 - 👨‍🏫 Enseigner l'électronique
 - 📚 Créer des tutoriels interactifs
 - 🎯 Projets guidés par l'IA
 - 📈 Suivi de progression
+- 💡 **Démonstrations en temps réel**
 
 ---
 
@@ -313,6 +430,9 @@ Nous accueillons toutes les contributions ! Consultez la [ROADMAP.md](ROADMAP.md
 - 🗺️ [Feuille de Route](ROADMAP.md)
 - 🎨 [Guide d'Interface](docs/GUIDE_INTERFACE_FR.md)
 - 🔧 [Améliorations UI](docs/UI_IMPROVEMENTS.md)
+- 🛠️ **[Guide Tool Calling](docs/TOOL_CALLING_USER_GUIDE.md)** - Comment utiliser les outils IA
+- 📋 [Analyse de l'Assistant IA](docs/AI_ASSISTANT_ANALYSIS.md)
+- ✅ [Implémentation Tool Calling](IMPLEMENTATION_COMPLETE.md)
 
 ---
 

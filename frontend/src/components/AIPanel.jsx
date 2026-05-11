@@ -149,8 +149,8 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                 onChange={(e) => setProvider(e.target.value)}
                                 className="provider-select"
                             >
-                                <option value="groq">Groq Llama 3</option>
-                                <option value="gemini">Gemini 2.5</option>
+                                <option value="groq">Groq Llama 3.3</option>
+                                <option value="gemini">Gemini 2.0 Flash</option>
                             </select>
                             <button 
                                 onClick={() => setEnableTools(!enableTools)}

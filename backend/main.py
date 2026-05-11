@@ -254,6 +254,10 @@ async def generate_code(query: AIQuery):
     # Use workspace path if provided, otherwise use current directory
     workspace = query.workspace_path or os.getcwd()
     
+    print(f"[DEBUG] Workspace path: {workspace}")
+    print(f"[DEBUG] Context: {query.context}")
+    print(f"[DEBUG] Enable tools: {query.enable_tools}")
+    
     # Create agent with workspace
     from agents import CodeGeneratorAgent
     agent = CodeGeneratorAgent(workspace_root=workspace)
@@ -265,6 +269,13 @@ async def generate_code(query: AIQuery):
     # Add current file context
     if query.context and query.context.get('current_file'):
         current_file = query.context['current_file']
+        # Use full path for file operations
+        file_full_path = os.path.join(workspace, current_file['path']) if workspace else current_file['path']
+        
+        print(f"[DEBUG] Current file: {current_file['name']}")
+        print(f"[DEBUG] File path: {current_file['path']}")
+        print(f"[DEBUG] Full path: {file_full_path}")
+        
         context_parts.append(f"[CURRENT FILE: '{current_file['name']}' at '{current_file['path']}']")
         if current_file.get('content'):
             context_parts.append(f"Current file content:\n```cpp\n{current_file['content']}\n```")
@@ -303,6 +314,8 @@ async def generate_code(query: AIQuery):
     if context_parts:
         enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
     
+    print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
+    
     result = agent.generate(
         enhanced_prompt, 
         query.board, 
@@ -310,6 +323,10 @@ async def generate_code(query: AIQuery):
         query.history, 
         query.enable_tools
     )
+    
+    print(f"[DEBUG] Result: {result.get('message', '')[:100]}...")
+    print(f"[DEBUG] Tool calls: {len(result.get('tool_calls', []))}")
+    
     return result
 
 @app.post("/ai/vision")
