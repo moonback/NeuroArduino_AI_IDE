@@ -12,7 +12,7 @@ const BoardManager = ({ onClose }) => {
     const fetchInstalled = async () => {
         try {
             const res = await axios.get('http://localhost:8001/boards/installed');
-            const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+            const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setInstalled(data || []);
         } catch (err) {
             console.error('Failed to fetch installed cores', err);
@@ -28,7 +28,7 @@ const BoardManager = ({ onClose }) => {
         setLoading(true);
         try {
             const res = await axios.get(`http://localhost:8001/boards/search?query=${query}`);
-            const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+            const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setCores(data || []);
         } catch (err) {
             console.error('Core search failed', err);

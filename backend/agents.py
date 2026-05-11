@@ -154,9 +154,133 @@ class HardwareRulesAgent:
             warnings.append("ℹ️ NOTE: Pins 0 and 1 are used for Serial communication. Avoid using them for IO if using Serial.")
         return warnings
 
+
+class VisionAgent:
+    """Analyzes wiring photos using Gemini multimodal and generates Arduino code."""
+
+    def __init__(self):
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if self.gemini_api_key:
+            genai.configure(api_key=self.gemini_api_key)
+            # Use a model that supports multimodal input
+            self.model = genai.GenerativeModel("gemini-1.5-flash")
+        else:
+            self.model = None
+
+    def analyze(self, image_data: str, prompt: str = "", board: str = "arduino:avr:uno") -> dict:
+        """
+        Analyze a base64-encoded image of an Arduino wiring setup.
+        Returns dict with keys: code, explanation, components
+        """
+        if not self.model:
+            return {
+                "code": "// Error: GEMINI_API_KEY is required for Vision-to-Wire.\n// Please set it in your .env file.",
+                "explanation": "Gemini API key is not configured. Vision-to-Wire requires a valid GEMINI_API_KEY.",
+                "components": []
+            }
+
+        try:
+            import base64
+
+            # Extract mime type and raw base64 from data URL
+            # Format: data:image/jpeg;base64,/9j/4AAQ...
+            if "," in image_data:
+                header, b64_data = image_data.split(",", 1)
+                mime_type = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+            else:
+                b64_data = image_data
+                mime_type = "image/jpeg"
+
+            image_bytes = base64.b64decode(b64_data)
+
+            system_prompt = (
+                "You are Audino Vision, an expert Arduino wiring analyzer.\n"
+                "You are given a photo of an Arduino/electronics breadboard wiring setup.\n\n"
+                "Your task is to:\n"
+                "1. IDENTIFY all visible electronic components (LEDs, resistors, sensors, motors, buttons, etc.)\n"
+                "2. TRACE the wiring connections between components and the Arduino board\n"
+                "3. DETERMINE which Arduino pins are connected to which components\n"
+                "4. GENERATE clean, correct, compilable Arduino code that matches the wiring\n\n"
+                f"Target board: {board}\n\n"
+                "You MUST respond in EXACTLY this format (use these exact headers):\n"
+                "COMPONENTS: comma-separated list of detected components\n"
+                "EXPLANATION: 2-3 sentence description of the circuit and what the code does\n"
+                "CODE:\n```\n<your Arduino code here>\n```\n"
+            )
+
+            user_msg = "Analyze this Arduino wiring photo and generate the corresponding code."
+            if prompt:
+                user_msg += f"\n\nAdditional context from the user: {prompt}"
+
+            # Build multimodal content
+            image_part = {
+                "mime_type": mime_type,
+                "data": image_bytes
+            }
+
+            response = self.model.generate_content([
+                system_prompt,
+                image_part,
+                user_msg
+            ])
+
+            return self._parse_response(response.text)
+
+        except Exception as e:
+            print(f"Vision Analysis Error: {e}")
+            return {
+                "code": f"// Error during vision analysis.\n// Details: {str(e)}",
+                "explanation": f"An error occurred during image analysis: {str(e)}",
+                "components": []
+            }
+
+    def _parse_response(self, text: str) -> dict:
+        """Parse the structured response from Gemini into components, explanation, and code."""
+        components = []
+        explanation = ""
+        code = ""
+
+        # Extract components
+        comp_match = re.search(r'COMPONENTS:\s*(.+?)(?:\n|EXPLANATION)', text, re.DOTALL | re.IGNORECASE)
+        if comp_match:
+            comp_str = comp_match.group(1).strip()
+            components = [c.strip() for c in comp_str.split(",") if c.strip()]
+
+        # Extract explanation
+        exp_match = re.search(r'EXPLANATION:\s*(.+?)(?:\nCODE|```)', text, re.DOTALL | re.IGNORECASE)
+        if exp_match:
+            explanation = exp_match.group(1).strip()
+
+        # Extract code
+        code_match = re.search(r'```(?:cpp|c\+\+|arduino|c)?\s*\n?(.*?)```', text, re.DOTALL)
+        if code_match:
+            code = code_match.group(1).strip()
+        else:
+            # Try to find code block after CODE: header
+            code_match2 = re.search(r'CODE:\s*\n(.*)', text, re.DOTALL | re.IGNORECASE)
+            if code_match2:
+                code = code_match2.group(1).strip()
+                code = code.replace("```cpp", "").replace("```c++", "").replace("```arduino", "").replace("```", "").strip()
+
+        # Fallback: if parsing failed, use the full text
+        if not code:
+            code = "// Could not parse code from vision response.\n// Raw response was logged to console."
+            print(f"Vision parse fallback. Raw text:\n{text}")
+
+        if not explanation:
+            explanation = "Circuit analyzed successfully."
+
+        return {
+            "code": code,
+            "explanation": explanation,
+            "components": components
+        }
+
+
 # Main Orchestrator
 code_agent = CodeGeneratorAgent()
 safety_agent = HardwareRulesAgent()
+vision_agent = VisionAgent()
 
 def process_ai_request(prompt: str, board: str, provider: str = "groq", history: list = None):
     # 1. Generate Code
@@ -173,3 +297,16 @@ def process_ai_request(prompt: str, board: str, provider: str = "groq", history:
         explanation += "\n\n" + "\n".join(warnings)
     
     return {"code": code, "explanation": explanation}
+
+def process_vision_request(image_data: str, prompt: str = "", board: str = "arduino:avr:uno"):
+    # 1. Vision Analysis
+    result = vision_agent.analyze(image_data, prompt, board)
+    
+    # 2. Safety Check on generated code
+    combined_prompt = prompt + " " + " ".join(result.get("components", []))
+    warnings = safety_agent.check_safety(combined_prompt, result.get("code", ""))
+    
+    if warnings:
+        result["explanation"] += "\n\n" + "\n".join(warnings)
+    
+    return result

@@ -6,12 +6,12 @@ import sys
 import os
 import subprocess
 import tempfile
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 # Import Agents
 # Ensure current dir is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from agents import process_ai_request
+from agents import process_ai_request, process_vision_request
 
 def get_cli_path():
     # Detect if we are running in a PyInstaller bundle
@@ -48,6 +48,11 @@ class AIQuery(BaseModel):
     board: str = "arduino:avr:uno"
     provider: str = "groq" # Default to groq
     history: Optional[List[dict]] = None
+
+class VisionQuery(BaseModel):
+    image_data: str  # base64 data URL
+    prompt: Optional[str] = ""
+    board: str = "arduino:avr:uno"
 
 @app.get("/")
 def read_root():
@@ -141,10 +146,13 @@ async def search_libraries(query: str):
     cli_path = get_cli_path()
     try:
         cmd = [cli_path, "lib", "search", query, "--format", "json"]
+        import json
         result = subprocess.run(cmd, capture_output=True, text=True)
-        # Note: if nothing found, result might be empty or error code
-        return result.stdout if result.returncode == 0 else "[]"
+        if result.returncode == 0:
+            return json.loads(result.stdout) if result.stdout.strip() else {"libraries": []}
+        return {"libraries": []}
     except Exception as e:
+        print(f"Library Search Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/libraries/installed")
@@ -152,9 +160,13 @@ async def list_installed_libraries():
     cli_path = get_cli_path()
     try:
         cmd = [cli_path, "lib", "list", "--format", "json"]
+        import json
         result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.stdout if result.returncode == 0 else "[]"
+        if result.returncode == 0:
+            return json.loads(result.stdout) if result.stdout.strip() else {"libraries": []}
+        return {"libraries": []}
     except Exception as e:
+        print(f"Library List Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/libraries/install")
@@ -178,9 +190,13 @@ async def search_cores(query: str):
     cli_path = get_cli_path()
     try:
         cmd = [cli_path, "core", "search", query, "--format", "json"]
+        import json
         result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.stdout if result.returncode == 0 else "[]"
+        if result.returncode == 0:
+            return json.loads(result.stdout) if result.stdout.strip() else []
+        return []
     except Exception as e:
+        print(f"Board Search Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/boards/installed")
@@ -188,9 +204,13 @@ async def list_installed_cores():
     cli_path = get_cli_path()
     try:
         cmd = [cli_path, "core", "list", "--format", "json"]
+        import json
         result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.stdout if result.returncode == 0 else "[]"
+        if result.returncode == 0:
+            return json.loads(result.stdout) if result.stdout.strip() else []
+        return []
     except Exception as e:
+        print(f"Board List Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/boards/install")
@@ -230,9 +250,16 @@ async def generate_code(query: AIQuery):
     result = process_ai_request(query.prompt, query.board, query.provider, query.history)
     return result
 
+@app.post("/ai/vision")
+async def vision_analyze(query: VisionQuery):
+    """Analyze an image of Arduino wiring and generate corresponding code."""
+    if not query.image_data:
+        raise HTTPException(status_code=400, detail="No image data provided")
+    result = process_vision_request(query.image_data, query.prompt or "", query.board)
+    return result
+
 import serial
 import serial.tools.list_ports
-from typing import Dict
 
 class SerialManager:
     def __init__(self):

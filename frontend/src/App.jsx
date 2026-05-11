@@ -8,7 +8,8 @@ import SerialPlotter from './components/SerialPlotter';
 import InputModal from './components/InputModal';
 import LibraryManager from './components/LibraryManager';
 import BoardManager from './components/BoardManager';
-import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity } from 'lucide-react';
+import VisionPanel from './components/VisionPanel';
+import { Play, Upload, Settings, RefreshCw, PlugZap, Terminal as TerminalIcon, Cpu, ListFilter, Save, FilePlus, Package, Activity, Camera } from 'lucide-react';
 import axios from 'axios';
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
   const [modal, setModal] = useState({ isOpen: false, type: '', value: '' });
   const [showLibraryManager, setShowLibraryManager] = useState(false);
   const [showBoardManager, setShowBoardManager] = useState(false);
+  const [showVisionPanel, setShowVisionPanel] = useState(false);
   const [allBoards, setAllBoards] = useState([
     { name: 'Arduino Uno', fqbn: 'arduino:avr:uno' },
     { name: 'Arduino Nano', fqbn: 'arduino:avr:nano' },
@@ -379,10 +381,12 @@ function App() {
         onCreateFolder={handleCreateFolderClick}
         onToggleLibraryManager={() => { setShowLibraryManager(!showLibraryManager); setShowBoardManager(false); }}
         onToggleBoardManager={() => { setShowBoardManager(!showBoardManager); setShowLibraryManager(false); }}
+        onToggleVisionPanel={() => { setShowVisionPanel(true); }}
       />
 
       {showLibraryManager && <LibraryManager onClose={() => setShowLibraryManager(false)} />}
       {showBoardManager && <BoardManager onClose={() => setShowBoardManager(false)} />}
+      {showVisionPanel && <VisionPanel onApplyCode={onCodeChange} onClose={() => setShowVisionPanel(false)} />}
 
       {/* Main Content */}
       <div className="flex flex-col grow min-w-0" style={{ background: '#0b0f14' }}>
@@ -546,7 +550,7 @@ function App() {
       </div>
 
       {/* Right AI Panel */}
-      <AIPanel onApplyCode={onCodeChange} />
+      <AIPanel onApplyCode={onCodeChange} onOpenVision={() => setShowVisionPanel(true)} />
     </div>
   );
 }

@@ -12,8 +12,8 @@ const LibraryManager = ({ onClose }) => {
     const fetchInstalled = async () => {
         try {
             const res = await axios.get('http://localhost:8001/libraries/installed');
-            const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-            setInstalled(data.libraries || []);
+            const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
+            setInstalled(data?.libraries || []);
         } catch (err) {
             console.error('Failed to fetch installed libs', err);
         }
@@ -28,8 +28,8 @@ const LibraryManager = ({ onClose }) => {
         setLoading(true);
         try {
             const res = await axios.get(`http://localhost:8001/libraries/search?query=${query}`);
-            const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-            setLibraries(data.libraries || []);
+            const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
+            setLibraries(data?.libraries || []);
         } catch (err) {
             console.error('Search failed', err);
         }

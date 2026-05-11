@@ -35,7 +35,7 @@ L'application repose sur une architecture moderne de type **Copilote pour Hardwa
 - [x] **Multi-Target Support** : Configurer facilement les profils pour ESP32, ESP8266 et STM32.
 
 ### 📅 Phase 3 : Intelligence Avancée (Long Terme)
-- [ ] **Vision-to-Wire** : Pouvoir uploader une photo de son montage pour que l'IA génère le code correspondant.
+- [x] **Vision-to-Wire** : Pouvoir uploader une photo de son montage pour que l'IA génère le code correspondant.
 - [ ] **Audit de Sécurité Profond** : Utiliser un LLM plus puissant (Gemini 1.5 Pro) pour simuler des scénarios de panne basés sur le code.
 - [ ] **Wokwi Integration** : Prévisualiser le comportement du code dans un simulateur web avant de flasher.
 

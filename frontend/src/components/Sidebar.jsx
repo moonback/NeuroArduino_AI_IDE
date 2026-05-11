@@ -1,12 +1,13 @@
-import { FileCode, Folder, Plus, Package, Cpu } from 'lucide-react';
+import { FileCode, Folder, Plus, Package, Cpu, Camera } from 'lucide-react';
 
-const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder, onToggleLibraryManager, onToggleBoardManager }) => {
+const Sidebar = ({ fileTree, onFileClick, onOpenFolder, onCreateFile, onCreateFolder, onToggleLibraryManager, onToggleBoardManager, onToggleVisionPanel }) => {
     return (
         <div style={{ width: '250px', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', fontSize: '0.85rem' }}>
             {/* Header */}
             <div style={{ padding: '8px 12px', background: '#111b27', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 600, letterSpacing: '0.5px', color: '#8b9bb4' }}>EXPLORER</span>
                 <div style={{ display: 'flex', gap: '2px' }}>
+                    <button onClick={onToggleVisionPanel} title="Vision-to-Wire" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-cyan-400 transition-colors"><Camera size={14} /></button>
                     <button onClick={onToggleBoardManager} title="Board Manager" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Cpu size={14} /></button>
                     <button onClick={onToggleLibraryManager} title="Library Manager" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><Package size={14} /></button>
                     <button onClick={onCreateFile} title="New File" className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"><FileCode size={14} /></button>

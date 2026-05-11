@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Send, Cpu, Sparkles } from 'lucide-react';
+import { Send, Cpu, Sparkles, Camera } from 'lucide-react';
 import axios from 'axios';
 
-const AIPanel = ({ onApplyCode }) => {
+const AIPanel = ({ onApplyCode, onOpenVision }) => {
     const [input, setInput] = useState('');
     const [provider, setProvider] = useState('groq'); // 'groq' or 'gemini'
     const [messages, setMessages] = useState([
@@ -128,6 +128,9 @@ const AIPanel = ({ onApplyCode }) => {
                         placeholder={`Ask ${provider === 'groq' ? 'Groq' : 'Gemini'} to blink an LED...`}
                         style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', flexGrow: 1, fontSize: '14px' }}
                     />
+                    <button onClick={onOpenVision} title="Vision-to-Wire" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
+                        <Camera size={16} color="#a78bfa" />
+                    </button>
                     <button onClick={sendMessage} title="Send" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                         <Send size={16} color="var(--accent)" />
                     </button>
