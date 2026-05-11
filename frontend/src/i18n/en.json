@@ -113,6 +113,20 @@
     "confirmReset": "Reset all settings to default?",
     "resetToDefaults": "Reset to Defaults",
     "cancel": "Cancel",
-    "saveSettings": "Save Settings"
+    "saveSettings": "Save Settings",
+    "codeAnalysis": "Code Analysis",
+    "codeAnalysisSettings": "Code Analysis Settings",
+    "automaticAnalysis": "Automatic Analysis",
+    "automaticAnalysisDescription": "Automatically analyze code when files are saved or opened",
+    "checkCategories": "Check Categories",
+    "checkCategoriesDescription": "Select which types of issues to detect",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "suggestions": "Suggestions",
+    "optimizations": "Optimizations",
+    "memoryThreshold": "Memory Usage Warning Threshold",
+    "memoryThresholdDescription": "Warn when global variables exceed this percentage of RAM",
+    "targetBoard": "Target Board",
+    "targetBoardDescription": "Board type for context-aware analysis"
   }
 }

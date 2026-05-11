@@ -1,7 +1,7 @@
 import os
 import re
 import json
-from groq import Groq
+from openai import OpenAI  # For OpenRouter (OpenAI-compatible)
 import google.generativeai as genai
 import sys
 from dotenv import load_dotenv
@@ -31,15 +31,20 @@ else:
 
 class CodeGeneratorAgent:
     def __init__(self, workspace_root: str = None):
-        # Groq Setup
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
-        if self.groq_api_key:
-            self.groq_client = Groq(api_key=self.groq_api_key)
-            # Use llama-3.3-70b-versatile (latest available model)
-            # Note: Function calling support varies by model
-            self.groq_model = "llama-3.3-70b-versatile"
+        # OpenRouter Setup (replaces Groq)
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        if self.openrouter_api_key:
+            # OpenRouter uses OpenAI-compatible API
+            from openai import OpenAI
+            self.openrouter_client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.openrouter_api_key,
+            )
+            # Use a free model from OpenRouter
+            # Options: meta-llama/llama-3.1-8b-instruct:free, google/gemma-2-9b-it:free
+            self.openrouter_model = "google/gemma-2-9b-it:free"
         else:
-            self.groq_client = None
+            self.openrouter_client = None
 
         # Gemini Setup
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -70,8 +75,8 @@ class CodeGeneratorAgent:
 
         history = history or []
 
-        # 1. Groq Provider (with function calling support)
-        if provider == "groq" and self.groq_client:
+        # 1. OpenRouter Provider (replaces Groq, uses OpenAI-compatible API)
+        if provider == "openrouter" and self.openrouter_client:
             try:
                 messages = [{"role": "system", "content": system_instruction}]
                 
@@ -82,16 +87,15 @@ class CodeGeneratorAgent:
                 # Add current prompt
                 messages.append({"role": "user", "content": prompt})
 
-                # Check if Groq supports function calling (it does for some models)
+                # OpenRouter supports function calling (OpenAI-compatible)
                 if enable_tools:
-                    # Try with function calling
                     try:
-                        print(f"[DEBUG] Calling Groq with tools enabled")
+                        print(f"[DEBUG] Calling OpenRouter with tools enabled")
                         print(f"[DEBUG] Number of tools available: {len(self.tool_registry.get_tool_definitions())}")
                         
-                        completion = self.groq_client.chat.completions.create(
+                        completion = self.openrouter_client.chat.completions.create(
                             messages=messages,
-                            model=self.groq_model,
+                            model=self.openrouter_model,
                             tools=self.tool_registry.get_tool_definitions(),
                             tool_choice="auto"
                         )
@@ -152,9 +156,9 @@ class CodeGeneratorAgent:
                         # Fallback to regular completion if function calling fails
                         print(f"[DEBUG] Function calling failed: {e}")
                         print(f"[DEBUG] Attempting manual tool parsing fallback")
-                        completion = self.groq_client.chat.completions.create(
+                        completion = self.openrouter_client.chat.completions.create(
                             messages=messages,
-                            model=self.groq_model,
+                            model=self.openrouter_model,
                         )
                         content = completion.choices[0].message.content
                         
@@ -181,9 +185,9 @@ class CodeGeneratorAgent:
                         return result
                 else:
                     # Tools disabled, regular generation
-                    completion = self.groq_client.chat.completions.create(
+                    completion = self.openrouter_client.chat.completions.create(
                         messages=messages,
-                        model=self.groq_model,
+                        model=self.openrouter_model,
                     )
                     content = completion.choices[0].message.content
                     code = self._extract_code(content)
@@ -195,9 +199,9 @@ class CodeGeneratorAgent:
                     }
                     
             except Exception as e:
-                print(f"Groq API Error: {e}")
+                print(f"OpenRouter API Error: {e}")
                 return {
-                    "message": f"Error: Groq Generation Failed.\nDetails: {str(e)}",
+                    "message": f"Error: OpenRouter Generation Failed.\nDetails: {str(e)}",
                     "code": None,
                     "tool_calls": [],
                     "tool_results": []
@@ -442,8 +446,8 @@ class CodeGeneratorAgent:
             loop_lines.append(f"analogWrite({motor_pin}, 128); // 50% speed")
 
         if not setup_lines:
-            if not self.groq_api_key and not self.gemini_api_key:
-                return "// Error: No AI API keys found (GROQ_API_KEY or GEMINI_API_KEY).\n// Please check your .env file."
+            if not self.openrouter_api_key and not self.gemini_api_key:
+                return "// Error: No AI API keys found (OPENROUTER_API_KEY or GEMINI_API_KEY).\n// Please check your .env file."
             return "// I'm not sure what you want to build. Try 'Blink LED' or 'Read Button'."
 
         code = "// Generated by Audino AI (Offline Mode)\n"

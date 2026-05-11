@@ -8,6 +8,7 @@ import json
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import re
+from code_analyzer import CodeAnalyzer
 
 class ToolRegistry:
     """Registry of all available tools for AI"""
@@ -220,6 +221,38 @@ class ToolRegistry:
                     },
                     "required": ["old_path", "new_path"]
                 }
+            },
+            
+            "analyze_code": {
+                "name": "analyze_code",
+                "description": "Analyze Arduino code for errors, warnings, suggestions, and optimizations. Provides intelligent code analysis with pattern detection for common issues, hardware safety concerns, and performance improvements.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Relative path to the file to analyze (defaults to current file if not specified)",
+                            "default": ""
+                        },
+                        "analysis_type": {
+                            "type": "string",
+                            "enum": ["full", "quick", "security", "performance"],
+                            "description": "Type of analysis: 'full' (all checks), 'quick' (errors and warnings only), 'security' (hardware safety), 'performance' (memory and optimization)",
+                            "default": "full"
+                        },
+                        "board": {
+                            "type": "string",
+                            "description": "Target Arduino board type (e.g., 'arduino:avr:uno', 'esp32:esp32:esp32')",
+                            "default": "arduino:avr:uno"
+                        },
+                        "language": {
+                            "type": "string",
+                            "enum": ["en", "fr"],
+                            "description": "Language for analysis messages ('en' for English, 'fr' for French)",
+                            "default": "en"
+                        }
+                    }
+                }
             }
         }
     
@@ -316,6 +349,8 @@ To use a tool, respond with a JSON object in this format:
                 return self._create_directory(**parameters)
             elif tool_name == "rename_file":
                 return self._rename_file(**parameters)
+            elif tool_name == "analyze_code":
+                return self._analyze_code(**parameters)
             else:
                 return {
                     "status": "error",
@@ -689,4 +724,81 @@ To use a tool, respond with a JSON object in this format:
             "modifications_applied": len(modifications),
             "changes": changes_made,
             "description": description
+        }
+
+    def _analyze_code(self, path: str = "", analysis_type: str = "full", 
+                      board: str = "arduino:avr:uno", language: str = "en") -> Dict:
+        """
+        Analyze Arduino code for errors, warnings, suggestions, and optimizations.
+        
+        Args:
+            path: Relative path to the file to analyze (defaults to current file)
+            analysis_type: Type of analysis - "full", "quick", "security", or "performance"
+            board: Target Arduino board type
+            language: Language for analysis messages ("en" or "fr")
+        
+        Returns:
+            Dictionary with status and analysis results
+        """
+        # If no path provided, return error (frontend should provide current file)
+        if not path:
+            return {
+                "status": "error",
+                "error": "No file path provided. Please specify a file to analyze."
+            }
+        
+        # Validate path
+        is_valid, full_path = self.validate_path(path)
+        if not is_valid:
+            return {"status": "error", "error": full_path}
+        
+        # Check if file exists
+        if not os.path.exists(full_path):
+            return {
+                "status": "error",
+                "error": f"File not found: {path}"
+            }
+        
+        # Read file content
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Failed to read file: {str(e)}"
+            }
+        
+        # Create analyzer instance
+        try:
+            analyzer = CodeAnalyzer(board=board, language=language)
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Failed to initialize analyzer: {str(e)}"
+            }
+        
+        # Perform analysis
+        try:
+            results = analyzer.analyze(code, analysis_type=analysis_type, board=board, language=language)
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Analysis failed: {str(e)}"
+            }
+        
+        # Return structured result
+        return {
+            "status": "success",
+            "path": path,
+            "analysis_type": analysis_type,
+            "board": board,
+            "language": language,
+            "results": results,
+            "summary": {
+                "errors": len(results.get("errors", [])),
+                "warnings": len(results.get("warnings", [])),
+                "suggestions": len(results.get("suggestions", [])),
+                "optimizations": len(results.get("optimizations", []))
+            }
         }

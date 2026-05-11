@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { Camera, ChevronLeft, ChevronRight, Cpu, Send, Sparkles, Wrench } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ToolCallDisplay from './ToolCallDisplay';
 
 const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, currentFile, currentCode, fileTree }) => {
     const { t } = useTranslation();
     const [input, setInput] = useState('');
-    const [provider, setProvider] = useState('groq'); // 'groq' or 'gemini'
+    const [provider, setProvider] = useState('openrouter'); // 'openrouter' or 'gemini'
     const [enableTools, setEnableTools] = useState(true); // Enable tool calling
     const [includeProjectContext, setIncludeProjectContext] = useState(false); // Include all project files
     const [messages, setMessages] = useState([
@@ -15,6 +15,16 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
     ]);
     const [loading, setLoading] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
+    
+    // Automatic analysis state
+    const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(() => {
+        const stored = localStorage.getItem('autoAnalysisEnabled');
+        return stored !== null ? JSON.parse(stored) : true; // Default to enabled
+    });
+    const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+    const debounceTimerRef = useRef(null);
+    const previousFileRef = useRef(null);
+    const previousCodeRef = useRef(null);
 
     const sendMessage = async () => {
         if (!input.trim()) return;
@@ -90,6 +100,62 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
         setLoading(false);
     };
     
+    // Automatic analysis function
+    const triggerAutoAnalysis = async () => {
+        if (!autoAnalysisEnabled || !currentFile || !currentCode) {
+            return;
+        }
+        
+        setIsAutoAnalyzing(true);
+        
+        try {
+            // Get workspace path from Electron API
+            let workspacePath = null;
+            if (window.api && window.api.getWorkspacePath) {
+                workspacePath = await window.api.getWorkspacePath();
+            }
+            
+            // Prepare context with current file info
+            const context = {
+                current_file: {
+                    name: currentFile.name,
+                    path: currentFile.path,
+                    content: currentCode
+                }
+            };
+            
+            // Call Backend API with analyze_code tool request
+            const res = await axios.post('http://localhost:8001/ai/generate', { 
+                prompt: 'Analyze this code for issues',
+                provider: provider,
+                enable_tools: true,
+                workspace_path: workspacePath || (fileTree ? fileTree.path : null),
+                context: context,
+                include_project_context: false,
+                history: []
+            });
+            
+            const aiMsg = {
+                role: 'assistant',
+                content: res.data.message || res.data.explanation,
+                code: res.data.code,
+                tool_calls: res.data.tool_calls || [],
+                tool_results: res.data.tool_results || [],
+                isAutoAnalysis: true
+            };
+            
+            // Only add to messages if there are findings
+            if (aiMsg.tool_results && aiMsg.tool_results.length > 0) {
+                setMessages(prev => [...prev, aiMsg]);
+            }
+        } catch (err) {
+            console.error('Auto-analysis error:', err);
+            // Don't show error to user for automatic analysis
+        }
+        
+        setIsAutoAnalyzing(false);
+    };
+    
     const handleToolResult = async (toolCall, result) => {
         // Auto-apply file operations to the editor
         switch (toolCall.tool) {
@@ -120,6 +186,68 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 break;
         }
     };
+    
+    // Store auto-analysis preference in localStorage
+    useEffect(() => {
+        localStorage.setItem('autoAnalysisEnabled', JSON.stringify(autoAnalysisEnabled));
+    }, [autoAnalysisEnabled]);
+    
+    // Detect file open events
+    useEffect(() => {
+        if (!currentFile || !autoAnalysisEnabled) {
+            return;
+        }
+        
+        // Check if file has changed (file open event)
+        if (previousFileRef.current?.path !== currentFile.path) {
+            previousFileRef.current = currentFile;
+            previousCodeRef.current = currentCode;
+            
+            // Clear any existing debounce timer
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            
+            // Trigger analysis after 2 second debounce
+            debounceTimerRef.current = setTimeout(() => {
+                triggerAutoAnalysis();
+            }, 2000);
+        }
+    }, [currentFile, autoAnalysisEnabled]);
+    
+    // Detect file save events (code changes)
+    useEffect(() => {
+        if (!currentFile || !autoAnalysisEnabled) {
+            return;
+        }
+        
+        // Check if code has changed significantly (not just typing)
+        // We detect "save" by checking if code changed but file path stayed the same
+        if (previousFileRef.current?.path === currentFile.path && 
+            previousCodeRef.current !== currentCode) {
+            
+            previousCodeRef.current = currentCode;
+            
+            // Clear any existing debounce timer
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            
+            // Trigger analysis after 2 second debounce
+            debounceTimerRef.current = setTimeout(() => {
+                triggerAutoAnalysis();
+            }, 2000);
+        }
+    }, [currentCode, currentFile, autoAnalysisEnabled]);
+    
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div className={`ai-panel ${isMinimized ? 'ai-panel-minimized' : ''}`}>
@@ -139,6 +267,11 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         <div className="ai-panel-title">
                             <Sparkles size={18} className="ai-icon-glow" />
                             <span>{t('aiAssistant')}</span>
+                            {isAutoAnalyzing && (
+                                <span className="auto-analysis-indicator" title="Analyzing code...">
+                                    ⚡
+                                </span>
+                            )}
                         </div>
                         
                         {/* Provider Selector & Tools Toggle */}
@@ -149,7 +282,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                 onChange={(e) => setProvider(e.target.value)}
                                 className="provider-select"
                             >
-                                <option value="groq">Groq Llama 3.3</option>
+                                <option value="openrouter">OpenRouter Llama 3.1</option>
                                 <option value="gemini">Gemini 2.0 Flash</option>
                             </select>
                             <button 
@@ -160,6 +293,21 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                 <Wrench size={14} />
                             </button>
                         </div>
+                    </div>
+                    
+                    {/* Auto-Analysis Toggle */}
+                    <div className="ai-auto-analysis-toggle">
+                        <label className="auto-analysis-label">
+                            <input 
+                                type="checkbox" 
+                                checked={autoAnalysisEnabled}
+                                onChange={(e) => setAutoAnalysisEnabled(e.target.checked)}
+                                className="auto-analysis-checkbox"
+                            />
+                            <span className="auto-analysis-text">
+                                ⚡ Auto-analyze on save/open
+                            </span>
+                        </label>
                     </div>
                     
                     {/* Project Context Toggle */}
@@ -259,7 +407,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                     <span></span>
                                 </div>
                                 <span className="ai-loading-text">
-                                    {provider === 'groq' ? 'Groq' : 'Gemini'} is thinking...
+                                    {provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} is thinking...
                                 </span>
                             </div>
                         )}
@@ -272,7 +420,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                 value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                                placeholder={`Ask ${provider === 'groq' ? 'Groq' : 'Gemini'} anything...`}
+                                placeholder={`Ask ${provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} anything...`}
                                 className="ai-input"
                             />
                             <div className="ai-input-actions">

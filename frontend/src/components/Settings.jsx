@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Globe, Palette, Code, Zap, Info, Save, RotateCcw } from 'lucide-react';
+import { Code, Globe, Info, Palette, RotateCcw, Save, Search, X, Zap } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const Settings = ({ onClose }) => {
@@ -16,6 +16,14 @@ const Settings = ({ onClose }) => {
         lineNumbers: localStorage.getItem('lineNumbers') !== 'false',
         minimap: localStorage.getItem('minimap') === 'true',
         wordWrap: localStorage.getItem('wordWrap') === 'true',
+        // Code Analysis Settings
+        autoAnalysis: localStorage.getItem('autoAnalysis') !== 'false', // Default true
+        analysisErrors: localStorage.getItem('analysisErrors') !== 'false',
+        analysisWarnings: localStorage.getItem('analysisWarnings') !== 'false',
+        analysisSuggestions: localStorage.getItem('analysisSuggestions') !== 'false',
+        analysisOptimizations: localStorage.getItem('analysisOptimizations') !== 'false',
+        memoryThreshold: parseInt(localStorage.getItem('memoryThreshold')) || 50,
+        targetBoard: localStorage.getItem('targetBoard') || 'arduino:avr:uno',
     });
 
     const [activeTab, setActiveTab] = useState('general');
@@ -58,6 +66,14 @@ const Settings = ({ onClose }) => {
                 lineNumbers: true,
                 minimap: false,
                 wordWrap: true,
+                // Code Analysis Defaults
+                autoAnalysis: true,
+                analysisErrors: true,
+                analysisWarnings: true,
+                analysisSuggestions: true,
+                analysisOptimizations: true,
+                memoryThreshold: 50,
+                targetBoard: 'arduino:avr:uno',
             };
             setSettings(defaults);
             setHasChanges(true);
@@ -95,6 +111,13 @@ const Settings = ({ onClose }) => {
                         >
                             <Code size={16} />
                             <span>{t('editor') || 'Editor'}</span>
+                        </button>
+                        <button
+                            className={`settings-tab ${activeTab === 'analysis' ? 'settings-tab-active' : ''}`}
+                            onClick={() => setActiveTab('analysis')}
+                        >
+                            <Search size={16} />
+                            <span>{t('codeAnalysis') || 'Code Analysis'}</span>
                         </button>
                         <button
                             className={`settings-tab ${activeTab === 'appearance' ? 'settings-tab-active' : ''}`}
@@ -269,6 +292,126 @@ const Settings = ({ onClose }) => {
                                         />
                                         <span className="settings-toggle-slider"></span>
                                     </label>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Code Analysis Tab */}
+                        {activeTab === 'analysis' && (
+                            <div className="settings-section">
+                                <h3 className="settings-section-title">{t('codeAnalysisSettings') || 'Code Analysis Settings'}</h3>
+                                
+                                {/* Automatic Analysis */}
+                                <div className="settings-item">
+                                    <div className="settings-item-info">
+                                        <label className="settings-label">
+                                            {t('automaticAnalysis') || 'Automatic Analysis'}
+                                        </label>
+                                        <p className="settings-description">
+                                            {t('automaticAnalysisDescription') || 'Automatically analyze code when files are saved or opened'}
+                                        </p>
+                                    </div>
+                                    <label className="settings-toggle">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.autoAnalysis}
+                                            onChange={(e) => handleChange('autoAnalysis', e.target.checked)}
+                                        />
+                                        <span className="settings-toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                {/* Check Categories */}
+                                <div className="settings-item">
+                                    <div className="settings-item-info">
+                                        <label className="settings-label">
+                                            {t('checkCategories') || 'Check Categories'}
+                                        </label>
+                                        <p className="settings-description">
+                                            {t('checkCategoriesDescription') || 'Select which types of issues to detect'}
+                                        </p>
+                                    </div>
+                                    <div className="settings-checkbox-group">
+                                        <label className="settings-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.analysisErrors}
+                                                onChange={(e) => handleChange('analysisErrors', e.target.checked)}
+                                            />
+                                            <span>{t('errors') || 'Errors'}</span>
+                                        </label>
+                                        <label className="settings-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.analysisWarnings}
+                                                onChange={(e) => handleChange('analysisWarnings', e.target.checked)}
+                                            />
+                                            <span>{t('warnings') || 'Warnings'}</span>
+                                        </label>
+                                        <label className="settings-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.analysisSuggestions}
+                                                onChange={(e) => handleChange('analysisSuggestions', e.target.checked)}
+                                            />
+                                            <span>{t('suggestions') || 'Suggestions'}</span>
+                                        </label>
+                                        <label className="settings-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.analysisOptimizations}
+                                                onChange={(e) => handleChange('analysisOptimizations', e.target.checked)}
+                                            />
+                                            <span>{t('optimizations') || 'Optimizations'}</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Memory Threshold */}
+                                <div className="settings-item">
+                                    <div className="settings-item-info">
+                                        <label className="settings-label">
+                                            {t('memoryThreshold') || 'Memory Usage Warning Threshold'}
+                                        </label>
+                                        <p className="settings-description">
+                                            {t('memoryThresholdDescription') || 'Warn when global variables exceed this percentage of RAM'}
+                                        </p>
+                                    </div>
+                                    <div className="settings-slider-container">
+                                        <input
+                                            type="range"
+                                            min="25"
+                                            max="90"
+                                            step="5"
+                                            value={settings.memoryThreshold}
+                                            onChange={(e) => handleChange('memoryThreshold', parseInt(e.target.value))}
+                                            className="settings-slider"
+                                        />
+                                        <span className="settings-slider-value">{settings.memoryThreshold}%</span>
+                                    </div>
+                                </div>
+
+                                {/* Target Board */}
+                                <div className="settings-item">
+                                    <div className="settings-item-info">
+                                        <label className="settings-label">
+                                            {t('targetBoard') || 'Target Board'}
+                                        </label>
+                                        <p className="settings-description">
+                                            {t('targetBoardDescription') || 'Board type for context-aware analysis'}
+                                        </p>
+                                    </div>
+                                    <select
+                                        value={settings.targetBoard}
+                                        onChange={(e) => handleChange('targetBoard', e.target.value)}
+                                        className="settings-select"
+                                    >
+                                        <option value="arduino:avr:uno">Arduino Uno</option>
+                                        <option value="arduino:avr:nano">Arduino Nano</option>
+                                        <option value="arduino:avr:mega">Arduino Mega</option>
+                                        <option value="esp32:esp32:esp32">ESP32</option>
+                                        <option value="esp8266:esp8266:generic">ESP8266</option>
+                                    </select>
                                 </div>
                             </div>
                         )}
