@@ -75,6 +75,61 @@ class ToolRegistry:
                 }
             },
             
+            "smart_modify_file": {
+                "name": "smart_modify_file",
+                "description": "Intelligently modify specific parts of a file with multiple operations in one call. Safer than modify_file for complex changes.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Relative path to the file to modify"
+                        },
+                        "modifications": {
+                            "type": "array",
+                            "description": "List of modifications to apply in order",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": ["replace", "insert_after", "insert_before", "delete_lines", "replace_lines"],
+                                        "description": "Type of modification"
+                                    },
+                                    "search": {
+                                        "type": "string",
+                                        "description": "Text to search for (for replace, insert_after, insert_before)"
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "description": "Content to insert or replace with"
+                                    },
+                                    "start_line": {
+                                        "type": "integer",
+                                        "description": "Starting line number (for delete_lines, replace_lines)"
+                                    },
+                                    "end_line": {
+                                        "type": "integer",
+                                        "description": "Ending line number (for delete_lines, replace_lines)"
+                                    },
+                                    "count": {
+                                        "type": "integer",
+                                        "description": "Number of occurrences to replace (default: all)",
+                                        "default": -1
+                                    }
+                                },
+                                "required": ["type"]
+                            }
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Brief description of what changes are being made"
+                        }
+                    },
+                    "required": ["path", "modifications"]
+                }
+            },
+            
             "read_file": {
                 "name": "read_file",
                 "description": "Read the content of a file",
@@ -249,6 +304,8 @@ To use a tool, respond with a JSON object in this format:
                 return self._create_file(**parameters)
             elif tool_name == "modify_file":
                 return self._modify_file(**parameters)
+            elif tool_name == "smart_modify_file":
+                return self._smart_modify_file(**parameters)
             elif tool_name == "read_file":
                 return self._read_file(**parameters)
             elif tool_name == "delete_file":
@@ -472,4 +529,164 @@ To use a tool, respond with a JSON object in this format:
             "message": f"File renamed: {old_path} → {new_path}",
             "old_path": old_path,
             "new_path": new_path
+        }
+    
+    def _smart_modify_file(self, path: str, modifications: List[Dict], description: str = "") -> Dict:
+        """
+        Intelligently modify a file with multiple operations
+        Safer than modify_file for complex changes
+        """
+        is_valid, full_path = self.validate_path(path)
+        if not is_valid:
+            return {"status": "error", "error": full_path}
+        
+        if not os.path.exists(full_path):
+            return {"status": "error", "error": f"File not found: {path}"}
+        
+        # Read current content
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception as e:
+            return {"status": "error", "error": f"Failed to read file: {str(e)}"}
+        
+        original_content = content
+        lines = content.split('\n')
+        changes_made = []
+        
+        # Apply modifications in order
+        for idx, mod in enumerate(modifications):
+            mod_type = mod.get('type')
+            
+            try:
+                if mod_type == 'replace':
+                    search = mod.get('search')
+                    replace_with = mod.get('content', '')
+                    count = mod.get('count', -1)
+                    
+                    if not search:
+                        return {"status": "error", "error": f"Modification {idx}: 'search' required for replace"}
+                    
+                    if search not in content:
+                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                    
+                    if count == -1:
+                        content = content.replace(search, replace_with)
+                        occurrences = original_content.count(search)
+                    else:
+                        # Replace only 'count' occurrences
+                        parts = content.split(search, count)
+                        content = replace_with.join(parts)
+                        occurrences = count
+                    
+                    changes_made.append(f"Replaced {occurrences} occurrence(s) of text")
+                    lines = content.split('\n')
+                
+                elif mod_type == 'insert_after':
+                    search = mod.get('search')
+                    insert_content = mod.get('content', '')
+                    
+                    if not search:
+                        return {"status": "error", "error": f"Modification {idx}: 'search' required for insert_after"}
+                    
+                    if search not in content:
+                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                    
+                    # Find the line containing the search text
+                    for i, line in enumerate(lines):
+                        if search in line:
+                            lines.insert(i + 1, insert_content)
+                            changes_made.append(f"Inserted content after line {i + 1}")
+                            break
+                    
+                    content = '\n'.join(lines)
+                
+                elif mod_type == 'insert_before':
+                    search = mod.get('search')
+                    insert_content = mod.get('content', '')
+                    
+                    if not search:
+                        return {"status": "error", "error": f"Modification {idx}: 'search' required for insert_before"}
+                    
+                    if search not in content:
+                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                    
+                    # Find the line containing the search text
+                    for i, line in enumerate(lines):
+                        if search in line:
+                            lines.insert(i, insert_content)
+                            changes_made.append(f"Inserted content before line {i + 1}")
+                            break
+                    
+                    content = '\n'.join(lines)
+                
+                elif mod_type == 'delete_lines':
+                    start_line = mod.get('start_line')
+                    end_line = mod.get('end_line')
+                    
+                    if start_line is None:
+                        return {"status": "error", "error": f"Modification {idx}: 'start_line' required for delete_lines"}
+                    
+                    if end_line is None:
+                        end_line = start_line
+                    
+                    if start_line < 1 or start_line > len(lines):
+                        return {"status": "error", "error": f"Modification {idx}: Invalid start_line: {start_line}"}
+                    
+                    if end_line < start_line or end_line > len(lines):
+                        return {"status": "error", "error": f"Modification {idx}: Invalid end_line: {end_line}"}
+                    
+                    # Delete lines (convert to 0-indexed)
+                    del lines[start_line - 1:end_line]
+                    changes_made.append(f"Deleted lines {start_line}-{end_line}")
+                    content = '\n'.join(lines)
+                
+                elif mod_type == 'replace_lines':
+                    start_line = mod.get('start_line')
+                    end_line = mod.get('end_line')
+                    replace_content = mod.get('content', '')
+                    
+                    if start_line is None:
+                        return {"status": "error", "error": f"Modification {idx}: 'start_line' required for replace_lines"}
+                    
+                    if end_line is None:
+                        end_line = start_line
+                    
+                    if start_line < 1 or start_line > len(lines):
+                        return {"status": "error", "error": f"Modification {idx}: Invalid start_line: {start_line}"}
+                    
+                    if end_line < start_line or end_line > len(lines):
+                        return {"status": "error", "error": f"Modification {idx}: Invalid end_line: {end_line}"}
+                    
+                    # Replace lines (convert to 0-indexed)
+                    lines[start_line - 1:end_line] = [replace_content]
+                    changes_made.append(f"Replaced lines {start_line}-{end_line}")
+                    content = '\n'.join(lines)
+                
+                else:
+                    return {"status": "error", "error": f"Modification {idx}: Unknown type: {mod_type}"}
+            
+            except Exception as e:
+                return {"status": "error", "error": f"Modification {idx} failed: {str(e)}"}
+        
+        # Write modified content
+        try:
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception as e:
+            # Try to restore original content
+            try:
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(original_content)
+            except:
+                pass
+            return {"status": "error", "error": f"Failed to write file: {str(e)}"}
+        
+        return {
+            "status": "success",
+            "message": f"File modified: {path}",
+            "path": path,
+            "modifications_applied": len(modifications),
+            "changes": changes_made,
+            "description": description
         }

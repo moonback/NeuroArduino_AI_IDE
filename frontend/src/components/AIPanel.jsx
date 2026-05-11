@@ -227,8 +227,8 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                         </div>
                                     )}
 
-                                    {/* Code Block */}
-                                    {msg.code && (
+                                    {/* Code Block - Only show if no tool calls were made (for new file generation) */}
+                                    {msg.code && (!msg.tool_calls || msg.tool_calls.length === 0) && (
                                         <div className="ai-code-block">
                                             <div className="ai-code-header">
                                                 <div className="ai-code-label">

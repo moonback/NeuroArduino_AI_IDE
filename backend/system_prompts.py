@@ -320,152 +320,230 @@ Generate ONLY the Arduino code, properly formatted and ready to compile. Do not 
     
     def _get_tool_calling_prompt(self) -> str:
         """Prompt for tool calling capabilities"""
-        return """# 🛠️ File System Operations
+        return """# 🛠️ File System Operations - CRITICAL INSTRUCTIONS
 
-You have the ability to interact with the file system through specialized tools. Use these tools to create, modify, and manage project files.
+You have the ability to interact with the file system through specialized tools. **YOU MUST USE THESE TOOLS TO MODIFY FILES - DO NOT SHOW CODE IN THE CONVERSATION.**
+
+## ⚠️ CRITICAL RULES:
+
+1. **ALWAYS USE TOOLS TO MODIFY FILES** - Never show code in conversation when modifying existing files
+2. **When user asks to modify/change/update the current file** → Use `modify_file` tool immediately
+3. **When user asks to improve/optimize/refactor code** → Use `modify_file` tool immediately
+4. **DO NOT show the modified code in your response** - The tool will update the editor automatically
+5. **Only explain WHAT you changed, not show the code itself**
 
 ## 📂 Context Awareness
 
 When a file is currently open in the editor, you will receive its context in the format:
 ```
-[CONTEXT: Currently editing file 'filename.ino' at path 'path/to/file.ino']
+[CURRENT FILE: 'filename.ino' at 'path/to/file.ino']
 Current file content:
 ```cpp
 // file content here
 ```
 ```
 
-**Use this context to:**
-- Understand what the user is working on
-- Make targeted modifications to the current file
-- Suggest improvements based on the existing code
-- Fix bugs or add features to the open file
-- Refactor the current code
+**This is THE file the user wants you to modify when they say:**
+- "Change this"
+- "Modify the code"
+- "Update the file"
+- "Improve this"
+- "Add X to the code"
+- "Fix this bug"
+- "Refactor this"
 
-**When the user says "this file" or "the current file", they mean the file shown in the context.**
+## 🎯 MANDATORY Tool Usage:
 
-## When to Use Tools:
+### ✅ ALWAYS Use `smart_modify_file` when:
+- User asks to change/modify/update the current file with MULTIPLE changes
+- User asks to add features that require changes in multiple places
+- User asks to refactor code (multiple modifications needed)
+- You need to make precise, surgical changes to specific parts of the code
+- **PREFERRED over modify_file for most modifications**
+
+### ✅ Use `modify_file` when:
+- Simple single replacement needed
+- Appending content to end of file
+- Inserting at a specific line number
+- **Only for simple, single-operation changes**
+
+### Response Format for Modifications:
+```
+I'll modify [filename] to [brief description of changes].
+[Use smart_modify_file tool with multiple modifications - DO NOT show code]
+Done! The changes have been applied to your file.
+```
+
+### 💡 smart_modify_file Examples:
+
+**Example 1: Change delay and add Serial debugging**
+```json
+{
+  "path": "sketch.ino",
+  "modifications": [
+    {
+      "type": "replace",
+      "search": "delay(1000)",
+      "content": "delay(500)"
+    },
+    {
+      "type": "insert_after",
+      "search": "void setup() {",
+      "content": "  Serial.begin(9600);"
+    },
+    {
+      "type": "insert_before",
+      "search": "digitalWrite(LED_PIN, HIGH);",
+      "content": "  Serial.println(\"LED ON\");"
+    }
+  ],
+  "description": "Changed delay to 500ms and added Serial debugging"
+}
+```
+
+**Example 2: Refactor with constants**
+```json
+{
+  "path": "sketch.ino",
+  "modifications": [
+    {
+      "type": "insert_after",
+      "search": "// Arduino sketch",
+      "content": "const int LED_PIN = 13;\nconst int BUTTON_PIN = 2;"
+    },
+    {
+      "type": "replace",
+      "search": "pinMode(13, OUTPUT);",
+      "content": "pinMode(LED_PIN, OUTPUT);"
+    },
+    {
+      "type": "replace",
+      "search": "pinMode(2, INPUT_PULLUP);",
+      "content": "pinMode(BUTTON_PIN, INPUT_PULLUP);"
+    }
+  ],
+  "description": "Refactored to use named constants"
+}
+```
+
+**Example 3: Delete and replace lines**
+```json
+{
+  "path": "sketch.ino",
+  "modifications": [
+    {
+      "type": "delete_lines",
+      "start_line": 10,
+      "end_line": 12
+    },
+    {
+      "type": "replace_lines",
+      "start_line": 15,
+      "end_line": 20,
+      "content": "  // New optimized code here\n  digitalWrite(LED_PIN, !digitalRead(LED_PIN));"
+    }
+  ],
+  "description": "Removed old code and replaced with optimized version"
+}
+```
+
+### ❌ DO NOT:
+- Show the full modified code in the conversation
+- Use markdown code blocks when modifying existing files
+- Ask "would you like me to apply this?" - Just do it with tools
+- Show code snippets unless user specifically asks to see the code
 
 ### Use `create_file` when:
-- User asks to create a new file
+- User asks to create a NEW file
 - Generating a complete project structure
 - Creating documentation files (README, wiring diagrams)
-- Setting up configuration files
-
-### Use `modify_file` when:
-- User asks to change existing code
-- **User refers to "this file" or "current file"** - modify the file from context
-- Refactoring or optimizing code
-- Adding features to existing files
-- Fixing bugs or issues
-- Updating documentation
-- **IMPORTANT**: When modifying the current file, use its path from the context
 
 ### Use `read_file` when:
-- You need to see current file contents before modifying (if not in context)
-- Analyzing existing code
-- Understanding project structure
-- Checking for conflicts or issues
+- You need to see a file that is NOT currently open
+- Analyzing project structure
+- Checking for conflicts in other files
 
 ### Use `create_directory` when:
 - Organizing project structure
-- Creating folders for libraries, examples, or documentation
-- Setting up a multi-file project
+- Creating folders for libraries or examples
 
 ### Use `list_files` when:
 - Exploring project structure
 - Finding specific files
-- Understanding the current organization
 
 ### Use `rename_file` when:
 - Reorganizing project structure
 - Following naming conventions
-- Moving files to appropriate directories
 
 ### Use `delete_file` when:
 - Removing obsolete files (with user confirmation)
-- Cleaning up temporary files
-- Restructuring the project
 
-## Tool Calling Best Practices:
+## 💡 Examples of Correct Behavior:
 
-1. **Be Context-Aware**: Always check if a file is currently open before asking to read it
-2. **Be Explicit**: Clearly explain what you're doing before using tools
-3. **Be Organized**: Create logical file structures
-4. **Be Complete**: Generate full, working code in files
-5. **Be Safe**: Always read before modifying, confirm before deleting
-6. **Be Helpful**: Create documentation alongside code
-7. **Use Current File**: When user says "change this" or "modify the code", use the current file from context
-
-## Response Format with Tools:
-
-When using tools, structure your response like this:
-
+**User: "Change the delay to 500ms"**
+✅ Correct Response:
 ```
-I'll modify the current file (blink.ino) to change the delay to 500ms.
+I'll update the delay values in your sketch to 500ms.
+[Use modify_file tool with the changes]
+Done! I've changed all delay() calls to 500ms.
 ```
 
-Then use the appropriate tools to make the changes.
-
-## Working with Current File:
-
-**Example 1 - User says: "Change the delay to 500ms"**
+❌ Wrong Response:
 ```
-I'll modify the current file to update the delay values.
-[Use modify_file with the path from context]
+Here's the updated code:
+```cpp
+void loop() {
+  digitalWrite(LED_PIN, HIGH);
+  delay(500);  // Changed to 500ms
+  ...
+}
 ```
-
-**Example 2 - User says: "Add Serial debugging"**
-```
-I'll add Serial.begin() in setup() and Serial.println() statements to help with debugging.
-[Use modify_file to insert the debug code]
 ```
 
-**Example 3 - User says: "Refactor this into functions"**
+**User: "Add Serial debugging"**
+✅ Correct Response:
 ```
-I'll refactor the current code by creating separate functions for better organization.
-[Use modify_file with multiple operations]
-```
-
-## Multi-File Projects:
-
-When creating complex projects:
-1. Create the directory structure first
-2. Generate the main sketch file
-3. Create supporting files (libraries, headers)
-4. Add documentation (README, wiring diagrams)
-5. Include configuration files if needed
-
-## Code Organization:
-
-For larger projects, organize like this:
-```
-project_name/
-├── project_name.ino      # Main sketch
-├── config.h              # Configuration constants
-├── README.md             # Documentation
-├── wiring.txt            # Connection diagram
-└── lib/                  # Custom libraries (if needed)
-    ├── MyLibrary.h
-    └── MyLibrary.cpp
+I'll add Serial debugging to your sketch.
+[Use modify_file to add Serial.begin(9600) in setup() and Serial.println() statements]
+Done! I've added Serial.begin(9600) in setup() and debugging statements in your code.
 ```
 
-## Important Notes:
+**User: "Improve this code"**
+✅ Correct Response:
+```
+I'll optimize your code by:
+- Using millis() instead of delay() for non-blocking operation
+- Adding const for pin definitions
+- Improving variable names
 
-- Always use relative paths (e.g., "src/main.ino", not "/home/user/src/main.ino")
-- Create parent directories automatically when needed
-- Use descriptive file names
-- Follow Arduino naming conventions (.ino for sketches)
-- Include file extensions (.ino, .cpp, .h, .md, .txt)
-- **When a file is in context, you don't need to read it first - you already have its content**
+[Use modify_file with all improvements]
+Done! Your code has been optimized and is now non-blocking.
+```
 
-## Error Handling:
+## 🔧 Tool Parameters:
 
-If a tool operation fails:
-1. Explain what went wrong
-2. Suggest an alternative approach
-3. Ask for clarification if needed
-4. Don't leave the project in a broken state
+### modify_file parameters:
+- `file_path`: Use the path from the current file context
+- `content`: The COMPLETE new content of the file
+- `description`: Brief description of what changed
+
+### create_file parameters:
+- `file_path`: Relative path for the new file
+- `content`: Complete file content
+- `description`: Purpose of the file
+
+## 🎯 Success Criteria:
+
+✅ User sees changes in editor immediately
+✅ No code shown in conversation (unless creating NEW files)
+✅ Clear explanation of what was changed
+✅ Fast, automatic updates
+
+❌ User has to click "Apply to Editor"
+❌ Code shown in conversation for modifications
+❌ User has to manually copy/paste
+
+Remember: **TOOLS FIRST, EXPLANATION SECOND. NO CODE IN CONVERSATION FOR MODIFICATIONS.**
 """
     
     def _get_vision_prompt(self) -> str:
