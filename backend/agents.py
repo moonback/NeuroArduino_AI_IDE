@@ -43,7 +43,7 @@ class CodeGeneratorAgent:
             )
             # Use a free model from OpenRouter
             # Options: meta-llama/llama-3.1-8b-instruct:free, google/gemma-2-9b-it:free
-            self.openrouter_model = "google/gemma-2-9b-it:free"
+            self.openrouter_model = "openai/gpt-oss-120b:free"
         else:
             self.openrouter_client = None
 

@@ -1,6 +1,6 @@
+import axios from 'axios';
 import { Code, Eye, EyeOff, Globe, Info, Key, Palette, RotateCcw, Save, Search, X, Zap } from 'lucide-react';
 import { useState } from 'react';
-import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 
 const Settings = ({ onClose }) => {
@@ -488,7 +488,7 @@ const Settings = ({ onClose }) => {
                                             <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
                                                 openrouter.ai/keys
                                             </a>
-                                            {' '}— enables Llama 3.1, Gemma and many other models.
+                                            {' '}— enables GPT-OSS, Llama 3.1 and many other models.
                                         </p>
                                     </div>
                                     <div style={{ position: 'relative', display: 'flex', gap: '8px', alignItems: 'center' }}>

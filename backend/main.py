@@ -318,7 +318,7 @@ async def generate_code(query: AIQuery):
     workspace = query.workspace_path or os.getcwd()
     
     print(f"[DEBUG] Workspace path: {workspace}")
-    print(f"[DEBUG] Context: {query.context}")
+    # print(f"[DEBUG] Context: {query.context}") # Removed to prevent UnicodeEncodeError
     print(f"[DEBUG] Enable tools: {query.enable_tools}")
     
     try:
@@ -374,7 +374,7 @@ async def generate_code(query: AIQuery):
         if context_parts:
             enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
         
-        print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
+        # print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}") # Removed to prevent UnicodeEncodeError
         
         result = agent.generate(
             enhanced_prompt, 
