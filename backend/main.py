@@ -366,6 +366,21 @@ async def generate_code(query: AIQuery):
             if current_file.get('content'):
                 context_parts.append(f"Current file content:\n```cpp\n{current_file['content']}\n```")
         
+        # Add mentioned files context (@mentions)
+        if query.context and query.context.get('mentioned_files'):
+            mentioned_files = query.context['mentioned_files']
+            print(f"[DEBUG] Mentioned files: {len(mentioned_files)}")
+            
+            mentioned_context = []
+            for file_info in mentioned_files:
+                print(f"[DEBUG] Processing mentioned file: {file_info['name']}")
+                mentioned_context.append(f"\n--- @Mentioned File: {file_info['name']} ({file_info['path']}) ---")
+                if file_info.get('content'):
+                    mentioned_context.append(f"```cpp\n{file_info['content']}\n```")
+            
+            if mentioned_context:
+                context_parts.append(f"\n[MENTIONED FILES: {len(mentioned_files)} file(s) mentioned with @]\n" + "\n".join(mentioned_context))
+        
         # Add project context if requested
         if query.include_project_context and query.context and query.context.get('project_files'):
             project_files = query.context['project_files']

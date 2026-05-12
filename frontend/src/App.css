@@ -11,9 +11,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -22,6 +24,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -39,4 +42,287 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* ========================================
+   FILE MENTION (@) FEATURE STYLES
+   ======================================== */
+
+/* Mentioned Files Pills Container */
+.mentioned-files-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px 8px 0 0;
+}
+
+.mentioned-file-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+  color: #60a5fa;
+  transition: all 0.2s;
+}
+
+.mentioned-file-pill:hover {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.mentioned-file-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mentioned-file-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.mentioned-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 2px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  border-radius: 4px;
+}
+
+.mentioned-file-remove:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* File Suggestions Dropdown */
+.file-suggestions-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #1a1f2e;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(59, 130, 246, 0.1);
+  z-index: 1000;
+  margin-bottom: 2px;
+}
+
+.file-suggestions-dropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-suggestions-dropdown::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-suggestions-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+}
+
+.file-suggestions-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+.file-suggestions-header {
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.file-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.file-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.file-suggestion-item:hover,
+.file-suggestion-item.selected {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.file-suggestion-item.selected {
+  border-left: 3px solid #60a5fa;
+}
+
+.file-suggestion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.file-suggestion-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-suggestion-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e5e7eb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-suggestion-path {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* Message Mentioned Files */
+.message-mentioned-files {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 6px;
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+}
+
+.message-mentioned-files-label {
+  font-size: 11px;
+  color: #60a5fa;
+  margin-bottom: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.message-mentioned-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message-file-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.message-file-name {
+  font-weight: 500;
+  color: #60a5fa;
+}
+
+/* Input wrapper needs relative positioning for dropdown */
+.ai-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Adjust input container when files are mentioned */
+.ai-input-container:has(.mentioned-files-container) .ai-input-wrapper {
+  border-radius: 0 0 8px 8px;
+}
+
+.ai-input-container:has(.mentioned-files-container) .ai-input {
+  border-radius: 0 0 8px 8px;
+}
+
+/* Animation for file pills */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mentioned-file-pill {
+  animation: slideIn 0.2s ease-out;
+}
+
+/* Highlight @ symbol in input */
+.ai-input:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Tooltip for file suggestions */
+.file-suggestion-item:hover .file-suggestion-path {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Empty state for file suggestions */
+.file-suggestions-empty {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+/* Loading state for file suggestions */
+.file-suggestions-loading {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+/* Keyboard shortcut hint */
+.file-suggestions-hint {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .mentioned-file-name {
+    max-width: 100px;
+  }
+
+  .file-suggestions-dropdown {
+    max-height: 200px;
+  }
 }
