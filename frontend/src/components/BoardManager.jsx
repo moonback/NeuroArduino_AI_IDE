@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download, CheckCircle, Cpu, Loader2, ShieldCheck } from 'lucide-react';
-import axios from 'axios';
+import api from '../api';
 import { useTranslation } from 'react-i18next';
 
 const BoardManager = ({ onClose }) => {
@@ -13,7 +13,7 @@ const BoardManager = ({ onClose }) => {
 
     const fetchInstalled = async () => {
         try {
-            const res = await axios.get('http://localhost:8001/boards/installed');
+            const res = await api.get('/boards/installed');
             const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setInstalled(data || []);
         } catch (err) {
@@ -29,7 +29,7 @@ const BoardManager = ({ onClose }) => {
         if (!query.trim()) return;
         setLoading(true);
         try {
-            const res = await axios.get(`http://localhost:8001/boards/search?query=${query}`);
+            const res = await api.get(`/boards/search?query=${query}`);
             const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setCores(data || []);
         } catch (err) {
@@ -41,7 +41,7 @@ const BoardManager = ({ onClose }) => {
     const handleInstall = async (coreID) => {
         setInstalling(coreID);
         try {
-            await axios.post('http://localhost:8001/boards/install', { name: coreID });
+            await api.post('/boards/install', { name: coreID });
             await fetchInstalled();
             alert(`${coreID} ${t('installSuccess')}`);
         } catch (err) {
