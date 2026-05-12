@@ -249,7 +249,7 @@ function App() {
         if (content !== null) {
           initialCodeRef.current = content;
           setCode(content);
-          setCurrentFile({ ...file, fullPath });
+          setCurrentFile({ ...file, relativePath: file.path, fullPath });
           setIsDirty(false);
           addLog(`Opened file: ${file.name}`, 'info');
         } else {

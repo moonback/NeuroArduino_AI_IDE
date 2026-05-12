@@ -299,11 +299,22 @@ To use a tool, respond with a JSON object in this format:
     
     def validate_path(self, path: str) -> tuple[bool, str]:
         """Validate that a path is safe and within workspace"""
-        # Normalize path
-        full_path = os.path.normpath(os.path.join(self.workspace_root, path))
-        
-        # Check if path is within workspace
-        if not full_path.startswith(os.path.normpath(self.workspace_root)):
+        # Support both relative and absolute paths (LLMs sometimes return absolute paths)
+        is_windows_abs = bool(re.match(r'^[A-Za-z]:[\\/]', path or ''))
+        if os.path.isabs(path) or is_windows_abs:
+            full_path = os.path.normpath(path)
+        else:
+            full_path = os.path.normpath(os.path.join(self.workspace_root, path))
+
+        workspace_norm = os.path.normpath(self.workspace_root)
+
+        # Check if path is within workspace using commonpath for robustness
+        try:
+            common = os.path.commonpath([workspace_norm, full_path])
+        except ValueError:
+            return False, "Path is outside workspace"
+
+        if common != workspace_norm:
             return False, "Path is outside workspace"
         
         # Check for forbidden paths

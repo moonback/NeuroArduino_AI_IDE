@@ -44,7 +44,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
             const context = {
                 current_file: currentFile ? {
                     name: currentFile.name,
-                    path: currentFile.path,
+                    path: currentFile.relativePath || currentFile.path,
                     content: currentCode
                 } : null
             };
@@ -119,7 +119,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
             const context = {
                 current_file: {
                     name: currentFile.name,
-                    path: currentFile.path,
+                    path: currentFile.relativePath || currentFile.path,
                     content: currentCode
                 }
             };
