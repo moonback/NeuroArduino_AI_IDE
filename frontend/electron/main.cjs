@@ -175,6 +175,8 @@ function setupMenu(win) {
 
 
 function createWindow() {
+    console.log('[DEBUG] createWindow() called');
+    
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
@@ -188,12 +190,26 @@ function createWindow() {
         icon: path.join(__dirname, '../public/favicon.ico')
     });
 
+    console.log('[DEBUG] BrowserWindow created');
+
+    // Prevent window from closing accidentally
+    win.on('close', (event) => {
+        console.log('[DEBUG] Window close event');
+    });
+
+    win.on('closed', () => {
+        console.log('[DEBUG] Window closed event');
+    });
+
     // In development, load from Vite dev server
     if (process.env.ELECTRON_START_URL) {
+        console.log('[DEBUG] Loading from dev server:', process.env.ELECTRON_START_URL);
         win.loadURL(process.env.ELECTRON_START_URL);
     } else {
         // In production, load the local index.html
-        win.loadFile(path.join(__dirname, '../dist/index.html'));
+        const indexPath = path.join(__dirname, '../dist/index.html');
+        console.log('[DEBUG] Loading from file:', indexPath);
+        win.loadFile(indexPath);
     }
 
     // Setup Application Menu
@@ -365,21 +381,49 @@ function createWindow() {
 
     // Open DevTools in dev mode only
     if (!app.isPackaged) {
+        console.log('[DEBUG] Opening DevTools (dev mode)');
         win.webContents.openDevTools();
     }
+    
+    // Log when page finishes loading
+    win.webContents.on('did-finish-load', () => {
+        console.log('[DEBUG] Page finished loading');
+    });
+    
+    win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('[ERROR] Page failed to load:', errorCode, errorDescription);
+    });
+    
+    console.log('[DEBUG] createWindow() completed');
 }
 
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
+    console.log('[DEBUG] All windows closed event triggered');
     stopBackend();
     if (process.platform !== 'darwin') {
+        console.log('[DEBUG] Quitting app (not macOS)');
         app.quit();
     }
 });
 
 app.on('activate', () => {
+    console.log('[DEBUG] App activated');
     if (BrowserWindow.getAllWindows().length === 0) {
+        console.log('[DEBUG] No windows, creating new window');
         createWindow();
     }
+});
+
+app.on('before-quit', () => {
+    console.log('[DEBUG] App is about to quit');
+});
+
+app.on('will-quit', () => {
+    console.log('[DEBUG] App will quit');
+});
+
+app.on('quit', () => {
+    console.log('[DEBUG] App quit event');
 });

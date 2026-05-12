@@ -602,8 +602,20 @@ To use a tool, respond with a JSON object in this format:
                     if not search:
                         return {"status": "error", "error": f"Modification {idx}: 'search' required for replace"}
                     
+                    # CRITICAL FIX: Add debug logging and better error handling
+                    print(f"[DEBUG] Searching for: {search[:100]}...")
+                    print(f"[DEBUG] Search found in content: {search in content}")
+                    
                     if search not in content:
-                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                        # More informative error with context
+                        print(f"[WARNING] Search pattern not found in file")
+                        print(f"[DEBUG] File content preview: {content[:200]}...")
+                        return {
+                            "status": "error", 
+                            "error": f"Modification {idx}: Search text not found in file. The file may have been modified already or the search pattern is incorrect.",
+                            "search_pattern": search[:100],
+                            "file_preview": content[:200]
+                        }
                     
                     if count == -1:
                         content = content.replace(search, replace_with)
@@ -614,6 +626,7 @@ To use a tool, respond with a JSON object in this format:
                         content = replace_with.join(parts)
                         occurrences = count
                     
+                    print(f"[DEBUG] Replaced {occurrences} occurrence(s)")
                     changes_made.append(f"Replaced {occurrences} occurrence(s) of text")
                     lines = content.split('\n')
                 
@@ -624,15 +637,30 @@ To use a tool, respond with a JSON object in this format:
                     if not search:
                         return {"status": "error", "error": f"Modification {idx}: 'search' required for insert_after"}
                     
+                    # CRITICAL FIX: Add debug logging
+                    print(f"[DEBUG] insert_after - Searching for: {search[:100]}...")
+                    print(f"[DEBUG] Search found: {search in content}")
+                    
                     if search not in content:
-                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                        print(f"[WARNING] insert_after: Search pattern not found")
+                        return {
+                            "status": "error", 
+                            "error": f"Modification {idx}: Search text not found for insert_after operation.",
+                            "search_pattern": search[:100]
+                        }
                     
                     # Find the line containing the search text
+                    found = False
                     for i, line in enumerate(lines):
                         if search in line:
                             lines.insert(i + 1, insert_content)
                             changes_made.append(f"Inserted content after line {i + 1}")
+                            found = True
+                            print(f"[DEBUG] Inserted after line {i + 1}")
                             break
+                    
+                    if not found:
+                        return {"status": "error", "error": f"Modification {idx}: Could not find line with search text"}
                     
                     content = '\n'.join(lines)
                 
@@ -643,15 +671,30 @@ To use a tool, respond with a JSON object in this format:
                     if not search:
                         return {"status": "error", "error": f"Modification {idx}: 'search' required for insert_before"}
                     
+                    # CRITICAL FIX: Add debug logging
+                    print(f"[DEBUG] insert_before - Searching for: {search[:100]}...")
+                    print(f"[DEBUG] Search found: {search in content}")
+                    
                     if search not in content:
-                        return {"status": "error", "error": f"Modification {idx}: Search text not found: '{search[:50]}...'"}
+                        print(f"[WARNING] insert_before: Search pattern not found")
+                        return {
+                            "status": "error", 
+                            "error": f"Modification {idx}: Search text not found for insert_before operation.",
+                            "search_pattern": search[:100]
+                        }
                     
                     # Find the line containing the search text
+                    found = False
                     for i, line in enumerate(lines):
                         if search in line:
                             lines.insert(i, insert_content)
                             changes_made.append(f"Inserted content before line {i + 1}")
+                            found = True
+                            print(f"[DEBUG] Inserted before line {i + 1}")
                             break
+                    
+                    if not found:
+                        return {"status": "error", "error": f"Modification {idx}: Could not find line with search text"}
                     
                     content = '\n'.join(lines)
                 

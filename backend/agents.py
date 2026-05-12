@@ -103,10 +103,15 @@ class CodeGeneratorAgent:
                         
                         response_message = completion.choices[0].message
                         
-                        print(f"[DEBUG] Response has tool_calls: {hasattr(response_message, 'tool_calls') and response_message.tool_calls is not None}")
+                        # CRITICAL FIX: Handle None content from OpenRouter
+                        content = response_message.content or ""
+                        tool_calls_present = hasattr(response_message, 'tool_calls') and response_message.tool_calls is not None
+                        
+                        print(f"[DEBUG] Content: {content[:100] if content else 'None'}")
+                        print(f"[DEBUG] Response has tool_calls: {tool_calls_present}")
                         
                         # Check if AI wants to use tools
-                        if response_message.tool_calls:
+                        if tool_calls_present and response_message.tool_calls:
                             print(f"[DEBUG] AI wants to use {len(response_message.tool_calls)} tool(s)")
                             tool_calls = []
                             tool_results = []
@@ -135,8 +140,9 @@ class CodeGeneratorAgent:
                                     "result": result
                                 })
                             
+                            # CRITICAL FIX: Use the content variable we already extracted
                             return {
-                                "message": response_message.content or "I've executed the requested operations.",
+                                "message": content or "I've executed the requested operations.",
                                 "tool_calls": tool_calls,
                                 "tool_results": tool_results,
                                 "code": None
@@ -144,7 +150,16 @@ class CodeGeneratorAgent:
                         else:
                             print(f"[DEBUG] No tool calls, returning regular response")
                             # No tool calls, just return the message
-                            content = response_message.content
+                            # CRITICAL FIX: content already extracted above, handle None case
+                            if not content:
+                                print(f"[WARNING] OpenRouter returned no content and no tool calls")
+                                return {
+                                    "message": "I received your request but couldn't generate a response. Please try rephrasing.",
+                                    "code": None,
+                                    "tool_calls": [],
+                                    "tool_results": []
+                                }
+                            
                             code = self._extract_code(content)
                             return {
                                 "message": content if not code else self._remove_code_from_message(content),
@@ -161,7 +176,17 @@ class CodeGeneratorAgent:
                             messages=messages,
                             model=self.openrouter_model,
                         )
-                        content = completion.choices[0].message.content
+                        # CRITICAL FIX: Handle None content
+                        content = completion.choices[0].message.content or ""
+                        
+                        if not content:
+                            print(f"[WARNING] OpenRouter returned empty content in fallback")
+                            return {
+                                "message": "I encountered an error processing your request. Please try again.",
+                                "code": None,
+                                "tool_calls": [],
+                                "tool_results": []
+                            }
                         
                         # Try to parse manual tool calls from response
                         result = self._parse_response_with_tools(content)
