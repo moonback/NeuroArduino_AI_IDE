@@ -42,7 +42,6 @@ class CodeGeneratorAgent:
                 api_key=self.openrouter_api_key,
             )
             # Use a free model from OpenRouter
-            # Options: meta-llama/llama-3.1-8b-instruct:free, google/gemma-2-9b-it:free
             self.openrouter_model = "openai/gpt-oss-120b:free"
         else:
             self.openrouter_client = None
@@ -51,7 +50,7 @@ class CodeGeneratorAgent:
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         if self.gemini_api_key:
             self.gemini_client = genai.Client(api_key=self.gemini_api_key)
-            self.gemini_model_name = "gemini-1.5-flash"
+            self.gemini_model_name = "gemini-2.5-flash"
         else:
             self.gemini_client = None
             self.gemini_model_name = None
