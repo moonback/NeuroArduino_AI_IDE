@@ -14,9 +14,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && cross-env ELECTRON_START_URL=http://localhost:5173 electron .\"",
-    "electron:build": "vite build && electron-builder",
+    "electron:build": "npm run clean:electron-output && vite build && electron-builder",
     "build:backend": "cd ../backend && pyinstaller --onefile --name backend --clean main.py",
-    "package:win": "npm run build:backend && npm run electron:build -- --win"
+    "package:win": "npm run build:backend && npm run electron:build -- --win",
+    "clean:electron-output": "node scripts/prepare-electron-build.cjs"
   },
   "build": {
     "appId": "com.aireduino.ide",
