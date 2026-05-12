@@ -361,6 +361,8 @@ function createWindow() {
         }
     });
 
+    }
+
     // Open DevTools in dev mode only
     if (!app.isPackaged) {
         win.webContents.openDevTools();
