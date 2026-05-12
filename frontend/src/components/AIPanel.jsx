@@ -283,8 +283,8 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                 onChange={(e) => setProvider(e.target.value)}
                                 className="provider-select"
                             >
-                                <option value="openrouter">OpenRouter Llama 3.1</option>
-                                <option value="gemini">Gemini 2.0 Flash</option>
+                                <option value="openrouter">OpenRouter GPT-OSS</option>
+                                <option value="gemini">Gemini 2.5 Flash</option>
                             </select>
                             <button 
                                 onClick={() => setEnableTools(!enableTools)}
@@ -322,7 +322,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                     className="context-toggle-checkbox"
                                 />
                                 <span className="context-toggle-text">
-                                    📁 Include all project files ({fileTree.files.length} files)
+                                    📁 Inclure tous les fichiers du projet ({fileTree.files.length} files)
                                 </span>
                             </label>
                         </div>
@@ -337,7 +337,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         <div className="ai-current-file">
                             <div className="current-file-icon">📄</div>
                             <div className="current-file-info">
-                                <div className="current-file-label">Current File:</div>
+                                <div className="current-file-label">Fichier Actuel:</div>
                                 <div className="current-file-name">{currentFile.name}</div>
                             </div>
                         </div>
@@ -388,7 +388,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                                     onClick={() => onApplyCode(msg.code)} 
                                                     className="ai-code-apply-btn"
                                                 >
-                                                    Apply to Editor
+                                                    Appliquer à l'éditeur
                                                 </button>
                                             </div>
                                             <pre className="ai-code-content">
