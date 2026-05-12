@@ -168,6 +168,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 break;
                 
             case 'modify_file':
+            case 'smart_modify_file':
                 // Reload the modified file if it's currently open
                 if (result.path) {
                     await onFileModified(result.path);

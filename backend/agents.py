@@ -2,7 +2,8 @@ import os
 import re
 import json
 from openai import OpenAI  # For OpenRouter (OpenAI-compatible)
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 import sys
 from dotenv import load_dotenv
 from tools_registry import ToolRegistry
@@ -46,13 +47,14 @@ class CodeGeneratorAgent:
         else:
             self.openrouter_client = None
 
-        # Gemini Setup
+        # Gemini Setup (new google.genai SDK)
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            self.gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+            self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+            self.gemini_model_name = "gemini-1.5-flash"
         else:
-            self.gemini_model = None
+            self.gemini_client = None
+            self.gemini_model_name = None
         
         # Tool Registry
         self.tool_registry = ToolRegistry(workspace_root)
@@ -207,54 +209,55 @@ class CodeGeneratorAgent:
                     "tool_results": []
                 }
 
-        # 2. Gemini Provider (with native function calling support)
-        elif provider == "gemini" and self.gemini_model:
+        # 2. Gemini Provider (using new google.genai SDK)
+        elif provider == "gemini" and self.gemini_client:
             try:
-                # Gemini supports native function calling
                 if enable_tools:
-                    # Convert tool definitions to Gemini format
-                    # Gemini expects a list of function declarations
-                    from google.generativeai.types import FunctionDeclaration, Tool
-                    
+                    # Convert tool definitions to Gemini FunctionDeclaration format
                     gemini_functions = []
                     for tool_def in self.tool_registry.get_tool_definitions():
                         func = tool_def["function"]
-                        
-                        # Clean parameters - remove "default" fields that Gemini doesn't support
                         clean_params = self._clean_params_for_gemini(func["parameters"])
-                        
                         gemini_functions.append(
-                            FunctionDeclaration(
+                            genai_types.FunctionDeclaration(
                                 name=func["name"],
                                 description=func["description"],
                                 parameters=clean_params
                             )
                         )
                     
-                    gemini_tool = Tool(function_declarations=gemini_functions)
+                    gemini_tool = genai_types.Tool(function_declarations=gemini_functions)
+                    config = genai_types.GenerateContentConfig(
+                        tools=[gemini_tool],
+                        system_instruction=system_instruction
+                    )
                     
                     print(f"[DEBUG] Calling Gemini with {len(gemini_functions)} tools")
                     
-                    # Create model with tools
-                    model_with_tools = genai.GenerativeModel(
-                        "gemini-2.0-flash-exp",
-                        tools=[gemini_tool]
-                    )
-                    
-                    # Build chat history
-                    chat_history = []
+                    # Build content list from history + current prompt
+                    contents = []
                     for msg in history:
                         role = "user" if msg.get("role") == "user" else "model"
-                        chat_history.append({"role": role, "parts": [msg.get("content", "")]})
+                        contents.append(genai_types.Content(
+                            role=role,
+                            parts=[genai_types.Part.from_text(text=msg.get("content", ""))]
+                        ))
+                    contents.append(genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part.from_text(text=prompt)]
+                    ))
                     
-                    chat = model_with_tools.start_chat(history=chat_history)
-                    response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
+                    response = self.gemini_client.models.generate_content(
+                        model=self.gemini_model_name,
+                        contents=contents,
+                        config=config
+                    )
                     
-                    # Check if Gemini wants to use tools
-                    if response.candidates[0].content.parts:
-                        tool_calls = []
-                        tool_results = []
-                        
+                    # Check for tool calls in response
+                    tool_calls = []
+                    tool_results = []
+                    
+                    if response.candidates and response.candidates[0].content.parts:
                         for part in response.candidates[0].content.parts:
                             if hasattr(part, 'function_call') and part.function_call:
                                 fc = part.function_call
@@ -262,11 +265,7 @@ class CodeGeneratorAgent:
                                 tool_params = dict(fc.args)
                                 
                                 print(f"[DEBUG] Gemini calling tool: {tool_name}")
-                                print(f"[DEBUG] Parameters: {tool_params}")
-                                
-                                # Execute tool
                                 result = self.tool_registry.execute_tool(tool_name, tool_params)
-                                
                                 print(f"[DEBUG] Tool result: {result.get('status', 'unknown')}")
                                 
                                 tool_calls.append({
@@ -274,45 +273,26 @@ class CodeGeneratorAgent:
                                     "tool": tool_name,
                                     "parameters": tool_params
                                 })
-                                
                                 tool_results.append({
                                     "id": f"gemini_{len(tool_results)}",
                                     "tool": tool_name,
                                     "result": result
                                 })
-                        
-                        if tool_calls:
-                            # Get text response if any
-                            text_response = ""
+                    
+                    if tool_calls:
+                        text_response = ""
+                        if response.candidates and response.candidates[0].content.parts:
                             for part in response.candidates[0].content.parts:
                                 if hasattr(part, 'text') and part.text:
                                     text_response += part.text
-                            
-                            return {
-                                "message": text_response or "I've executed the requested operations.",
-                                "tool_calls": tool_calls,
-                                "tool_results": tool_results,
-                                "code": None
-                            }
+                        return {
+                            "message": text_response or "I've executed the requested operations.",
+                            "tool_calls": tool_calls,
+                            "tool_results": tool_results,
+                            "code": None
+                        }
                     
-                    # No tool calls, regular response
-                    content = response.text
-                    code = self._extract_code(content)
-                    return {
-                        "message": content if not code else self._remove_code_from_message(content),
-                        "code": code,
-                        "tool_calls": [],
-                        "tool_results": []
-                    }
-                else:
-                    # Tools disabled
-                    chat_history = []
-                    for msg in history:
-                        role = "user" if msg.get("role") == "user" else "model"
-                        chat_history.append({"role": role, "parts": [msg.get("content", "")]})
-                    
-                    chat = self.gemini_model.start_chat(history=chat_history)
-                    response = chat.send_message(f"{system_instruction}\n\nUser Request: {prompt}")
+                    # No tool calls — regular text response
                     content = response.text
                     code = self._extract_code(content)
                     return {
@@ -322,6 +302,36 @@ class CodeGeneratorAgent:
                         "tool_results": []
                     }
                 
+                else:
+                    # Tools disabled — simple generation
+                    contents = []
+                    for msg in history:
+                        role = "user" if msg.get("role") == "user" else "model"
+                        contents.append(genai_types.Content(
+                            role=role,
+                            parts=[genai_types.Part.from_text(text=msg.get("content", ""))]
+                        ))
+                    contents.append(genai_types.Content(
+                        role="user",
+                        parts=[genai_types.Part.from_text(text=prompt)]
+                    ))
+                    config = genai_types.GenerateContentConfig(
+                        system_instruction=system_instruction
+                    )
+                    response = self.gemini_client.models.generate_content(
+                        model=self.gemini_model_name,
+                        contents=contents,
+                        config=config
+                    )
+                    content = response.text
+                    code = self._extract_code(content)
+                    return {
+                        "message": content if not code else self._remove_code_from_message(content),
+                        "code": code,
+                        "tool_calls": [],
+                        "tool_results": []
+                    }
+
             except Exception as e:
                 import traceback
                 print(f"Gemini API Error: {e}")
@@ -473,11 +483,12 @@ class VisionAgent:
     def __init__(self):
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         if self.gemini_api_key:
-            genai.configure(api_key=self.gemini_api_key)
-            # Use a model that supports multimodal input
-            self.model = genai.GenerativeModel("gemini-2.5-flash")
+            # Use new google.genai SDK
+            self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+            self.gemini_model_name = "gemini-1.5-flash"
         else:
-            self.model = None
+            self.gemini_client = None
+            self.gemini_model_name = None
         
         # System Prompt Manager
         self.prompt_manager = get_prompt_manager()
@@ -487,7 +498,7 @@ class VisionAgent:
         Analyze a base64-encoded image of an Arduino wiring setup.
         Returns dict with keys: code, explanation, components
         """
-        if not self.model:
+        if not self.gemini_client:
             return {
                 "code": "// Error: GEMINI_API_KEY is required for Vision-to-Wire.\n// Please set it in your .env file.",
                 "explanation": "Gemini API key is not configured. Vision-to-Wire requires a valid GEMINI_API_KEY.",
@@ -519,17 +530,17 @@ class VisionAgent:
             if prompt:
                 user_msg += f"\n\nAdditional context from the user: {prompt}"
 
-            # Build multimodal content
-            image_part = {
-                "mime_type": mime_type,
-                "data": image_bytes
-            }
-
-            response = self.model.generate_content([
-                system_prompt,
-                image_part,
-                user_msg
-            ])
+            # Build multimodal content using new SDK types
+            response = self.gemini_client.models.generate_content(
+                model=self.gemini_model_name,
+                contents=[
+                    genai_types.Content(parts=[
+                        genai_types.Part.from_text(text=system_prompt),
+                        genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                        genai_types.Part.from_text(text=user_msg)
+                    ])
+                ]
+            )
 
             return self._parse_response(response.text)
 
@@ -584,17 +595,36 @@ class VisionAgent:
         }
 
 
-# Main Orchestrator
-code_agent = CodeGeneratorAgent()
-safety_agent = HardwareRulesAgent()
-vision_agent = VisionAgent()
+# Main Orchestrator - wrapped in try/except to prevent import-time crashes
+try:
+    code_agent = CodeGeneratorAgent()
+except Exception as e:
+    print(f"[WARNING] Failed to initialize CodeGeneratorAgent at import: {e}")
+    code_agent = None
+
+try:
+    safety_agent = HardwareRulesAgent()
+except Exception as e:
+    print(f"[WARNING] Failed to initialize HardwareRulesAgent at import: {e}")
+    safety_agent = None
+
+try:
+    vision_agent = VisionAgent()
+except Exception as e:
+    print(f"[WARNING] Failed to initialize VisionAgent at import: {e}")
+    vision_agent = None
 
 def process_ai_request(prompt: str, board: str, provider: str = "groq", history: list = None, enable_tools: bool = True):
+    if code_agent is None:
+        return {
+            "message": "AI agent failed to initialize. Check your API keys in .env",
+            "code": None, "tool_calls": [], "tool_results": []
+        }
     # 1. Generate Code or Execute Tools
     result = code_agent.generate(prompt, board, provider, history, enable_tools)
     
     # 2. Safety Check on generated code
-    if result.get("code"):
+    if result.get("code") and safety_agent:
         warnings = safety_agent.check_safety(prompt, result["code"])
         if warnings:
             result["message"] = result.get("message", "") + "\n\n" + "\n".join(warnings)

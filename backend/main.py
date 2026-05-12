@@ -62,6 +62,69 @@ class VisionQuery(BaseModel):
 def read_root():
     return {"status": "Aireduino Backend Online"}
 
+@app.post("/api/keys")
+async def update_api_keys(payload: Dict[str, str]):
+    """
+    Update API keys in the .env file.
+    Accepts: { openrouter_api_key: str, gemini_api_key: str }
+    """
+    allowed_keys = {
+        "openrouter_api_key": "OPENROUTER_API_KEY",
+        "gemini_api_key": "GEMINI_API_KEY",
+    }
+
+    # Determine .env file path (same dir as this script)
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+
+    # Read existing .env content
+    env_lines = []
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            env_lines = f.readlines()
+
+    # Build a dict of current env vars
+    env_dict = {}
+    for line in env_lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k, _, v = stripped.partition("=")
+            env_dict[k.strip()] = v.strip()
+
+    # Apply updates
+    updated = []
+    for payload_key, env_var in allowed_keys.items():
+        if payload_key in payload and payload[payload_key].strip():
+            new_value = payload[payload_key].strip()
+            env_dict[env_var] = new_value
+            updated.append(env_var)
+
+    if not updated:
+        raise HTTPException(status_code=400, detail="No valid keys provided.")
+
+    # Write back .env
+    with open(env_path, "w", encoding="utf-8") as f:
+        for k, v in env_dict.items():
+            f.write(f"{k}={v}\n")
+
+    # Reload environment variables immediately (for current process)
+    from dotenv import load_dotenv
+    load_dotenv(env_path, override=True)
+
+    # Signal agents to reinitialize on next request
+    try:
+        import importlib
+        import agents as agents_module
+        importlib.reload(agents_module)
+        print(f"[INFO] agents.py reloaded after key update: {updated}")
+    except Exception as e:
+        print(f"[WARNING] Could not reload agents: {e}")
+
+    return {
+        "status": "success",
+        "message": f"Updated and applied: {', '.join(updated)}",
+        "updated_keys": updated
+    }
+
 @app.get("/ports")
 def get_ports():
     try:
@@ -258,76 +321,84 @@ async def generate_code(query: AIQuery):
     print(f"[DEBUG] Context: {query.context}")
     print(f"[DEBUG] Enable tools: {query.enable_tools}")
     
-    # Create agent with workspace
-    from agents import CodeGeneratorAgent
-    agent = CodeGeneratorAgent(workspace_root=workspace)
-    
-    # Build enhanced prompt with context
-    enhanced_prompt = query.prompt
-    context_parts = []
-    
-    # Add current file context
-    if query.context and query.context.get('current_file'):
-        current_file = query.context['current_file']
-        # Use full path for file operations
-        file_full_path = os.path.join(workspace, current_file['path']) if workspace else current_file['path']
+    try:
+        # Create agent with workspace (inside try/except to catch init errors)
+        from agents import CodeGeneratorAgent
+        agent = CodeGeneratorAgent(workspace_root=workspace)
         
-        print(f"[DEBUG] Current file: {current_file['name']}")
-        print(f"[DEBUG] File path: {current_file['path']}")
-        print(f"[DEBUG] Full path: {file_full_path}")
+        # Build enhanced prompt with context
+        enhanced_prompt = query.prompt
+        context_parts = []
         
-        context_parts.append(f"[CURRENT FILE: '{current_file['name']}' at '{current_file['path']}']")
-        if current_file.get('content'):
-            context_parts.append(f"Current file content:\n```cpp\n{current_file['content']}\n```")
-    
-    # Add project context if requested
-    if query.include_project_context and query.context and query.context.get('project_files'):
-        project_files = query.context['project_files']
-        workspace_path = query.context.get('workspace_path', workspace)
-        
-        # Read content of relevant files (Arduino files, headers, etc.)
-        project_context = []
-        for file_info in project_files:
-            if file_info['isDirectory']:
-                continue
+        # Add current file context
+        if query.context and query.context.get('current_file'):
+            current_file = query.context['current_file']
+            # Use full path for file operations
+            file_full_path = os.path.join(workspace, current_file['path']) if workspace else current_file['path']
             
-            # Only include relevant file types
-            file_ext = os.path.splitext(file_info['name'])[1].lower()
-            if file_ext in ['.ino', '.cpp', '.h', '.c', '.hpp']:
-                try:
-                    file_path = os.path.join(workspace_path, file_info['path'].replace('/', os.sep))
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()
-                        # Limit file size to avoid token overflow
-                        if len(content) < 5000:
-                            project_context.append(f"\n--- File: {file_info['path']} ---\n{content}")
-                        else:
-                            # Include only first 2000 chars for large files
-                            project_context.append(f"\n--- File: {file_info['path']} (truncated) ---\n{content[:2000]}...\n[File truncated]")
-                except Exception as e:
-                    print(f"Error reading file {file_info['path']}: {e}")
+            print(f"[DEBUG] Current file: {current_file['name']}")
+            print(f"[DEBUG] File path: {current_file['path']}")
+            print(f"[DEBUG] Full path: {file_full_path}")
+            
+            context_parts.append(f"[CURRENT FILE: '{current_file['name']}' at '{current_file['path']}']")
+            if current_file.get('content'):
+                context_parts.append(f"Current file content:\n```cpp\n{current_file['content']}\n```")
         
-        if project_context:
-            context_parts.append(f"\n[PROJECT CONTEXT: {len(project_context)} files from workspace]\n" + "\n".join(project_context))
-    
-    # Combine context with prompt
-    if context_parts:
-        enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
-    
-    print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
-    
-    result = agent.generate(
-        enhanced_prompt, 
-        query.board, 
-        query.provider, 
-        query.history, 
-        query.enable_tools
-    )
-    
-    print(f"[DEBUG] Result: {result.get('message', '')[:100]}...")
-    print(f"[DEBUG] Tool calls: {len(result.get('tool_calls', []))}")
-    
-    return result
+        # Add project context if requested
+        if query.include_project_context and query.context and query.context.get('project_files'):
+            project_files = query.context['project_files']
+            workspace_path = query.context.get('workspace_path', workspace)
+            
+            project_context = []
+            for file_info in project_files:
+                if file_info['isDirectory']:
+                    continue
+                
+                file_ext = os.path.splitext(file_info['name'])[1].lower()
+                if file_ext in ['.ino', '.cpp', '.h', '.c', '.hpp']:
+                    try:
+                        file_path = os.path.join(workspace_path, file_info['path'].replace('/', os.sep))
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            if len(content) < 5000:
+                                project_context.append(f"\n--- File: {file_info['path']} ---\n{content}")
+                            else:
+                                project_context.append(f"\n--- File: {file_info['path']} (truncated) ---\n{content[:2000]}...\n[File truncated]")
+                    except Exception as e:
+                        print(f"Error reading file {file_info['path']}: {e}")
+            
+            if project_context:
+                context_parts.append(f"\n[PROJECT CONTEXT: {len(project_context)} files from workspace]\n" + "\n".join(project_context))
+        
+        # Combine context with prompt
+        if context_parts:
+            enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
+        
+        print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}")
+        
+        result = agent.generate(
+            enhanced_prompt, 
+            query.board, 
+            query.provider, 
+            query.history, 
+            query.enable_tools
+        )
+        
+        print(f"[DEBUG] Result: {result.get('message', '')[:100]}...")
+        print(f"[DEBUG] Tool calls: {len(result.get('tool_calls', []))}")
+        
+        return result
+    except Exception as e:
+        import traceback
+        print(f"AI Generation Error: {e}")
+        print(traceback.format_exc())
+        return {
+            "message": f"Sorry, I encountered an error during generation: {str(e)}",
+            "error": str(e),
+            "status": "error",
+            "tool_calls": [],
+            "tool_results": []
+        }
 
 @app.post("/ai/vision")
 async def vision_analyze(query: VisionQuery):
