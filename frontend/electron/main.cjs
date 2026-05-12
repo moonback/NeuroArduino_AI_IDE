@@ -17,6 +17,10 @@ if (!fs.existsSync(logsDir)) {
 const logFile = path.join(logsDir, `electron_${new Date().toISOString().split('T')[0]}.log`);
 const errorLogFile = path.join(logsDir, `electron_errors_${new Date().toISOString().split('T')[0]}.log`);
 
+// Fichier centralisé des erreurs à la racine du projet
+const projectRoot = path.join(__dirname, '..', '..');
+const centralErrorFile = path.join(projectRoot, 'ERRORS.txt');
+
 function formatLogMessage(level, message) {
     const timestamp = new Date().toISOString();
     return `${timestamp} - ${level} - ${message}\n`;
@@ -33,11 +37,23 @@ function writeLog(level, message, isError = false) {
     }
     
     // Write to main log file
-    fs.appendFileSync(logFile, logMessage, 'utf8');
+    try {
+        fs.appendFileSync(logFile, logMessage, 'utf8');
+    } catch (err) {
+        console.error('Failed to write to log file:', err);
+    }
     
     // Write to error log file if it's an error
     if (isError) {
-        fs.appendFileSync(errorLogFile, logMessage, 'utf8');
+        try {
+            fs.appendFileSync(errorLogFile, logMessage, 'utf8');
+            
+            // Also write to central error file at project root
+            const simplifiedMessage = `${new Date().toISOString().replace('T', ' ').split('.')[0]} - ${level} - [FRONTEND] ${message}\n`;
+            fs.appendFileSync(centralErrorFile, simplifiedMessage, 'utf8');
+        } catch (err) {
+            console.error('Failed to write to error log file:', err);
+        }
     }
 }
 
@@ -61,6 +77,7 @@ function logWarning(message) {
 logInfo('='.repeat(60));
 logInfo('Electron Frontend - Démarrage');
 logInfo(`Logs sauvegardés dans: ${logsDir}`);
+logInfo(`Erreurs centralisées dans: ${centralErrorFile}`);
 logInfo(`Version Electron: ${app.getVersion()}`);
 logInfo(`Plateforme: ${process.platform}`);
 logInfo('='.repeat(60));
