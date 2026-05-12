@@ -27,11 +27,33 @@ def get_cli_path():
         return local_cli
     return "arduino-cli" # Fallback to PATH
 
+def _parse_cors_origins() -> list[str]:
+    """Build a safe origin list for local dev + Electron + optional env overrides."""
+    default_origins = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "app://.",
+        "file://",
+        "null",  # Electron file:// origin appears as null in some contexts
+    }
+    raw = os.getenv("CORS_ORIGINS", "")
+    if raw.strip():
+        for origin in raw.split(","):
+            cleaned = origin.strip()
+            if cleaned:
+                default_origins.add(cleaned)
+    return sorted(default_origins)
+
+
 app = FastAPI(title="Arduino AI IDE Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_parse_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -462,7 +484,7 @@ class SerialManager:
         except Exception as e:
             print(f"WS Stream Error: {e}")
         finally:
-            self.clients.remove(websocket)
+            self.clients.discard(websocket)
 
 serial_manager = SerialManager()
 

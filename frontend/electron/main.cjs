@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const { initSerialHandlers } = require('./serial.cjs');
 
 let backendProcess = null;
+let ipcHandlersRegistered = false;
 
 function startBackend() {
     if (app.isPackaged) {
@@ -208,6 +209,9 @@ function createWindow() {
     const { ipcMain, dialog } = require('electron');
     const fs = require('fs');
 
+    if (!ipcHandlersRegistered) {
+    ipcHandlersRegistered = true;
+
     ipcMain.handle('fs:open-folder', async () => {
         const { canceled, filePaths } = await dialog.showOpenDialog(win, {
             properties: ['openDirectory']
@@ -357,8 +361,10 @@ function createWindow() {
         }
     });
 
-    // Open DevTools in dev mode
-    win.webContents.openDevTools();
+    // Open DevTools in dev mode only
+    if (!app.isPackaged) {
+        win.webContents.openDevTools();
+    }
 }
 
 app.whenReady().then(createWindow);
