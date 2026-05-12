@@ -1,12 +1,90 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 const { initSerialHandlers } = require('./serial.cjs');
 
 let backendProcess = null;
+let ipcHandlersRegistered = false;
+
+// ===== LOGGING SYSTEM =====
+const logsDir = path.join(app.getPath('userData'), 'logs');
+if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+}
+
+const logFile = path.join(logsDir, `electron_${new Date().toISOString().split('T')[0]}.log`);
+const errorLogFile = path.join(logsDir, `electron_errors_${new Date().toISOString().split('T')[0]}.log`);
+
+// Fichier centralisé des erreurs à la racine du projet
+const projectRoot = path.join(__dirname, '..', '..');
+const centralErrorFile = path.join(projectRoot, 'ERRORS.txt');
+
+function formatLogMessage(level, message) {
+    const timestamp = new Date().toISOString();
+    return `${timestamp} - ${level} - ${message}\n`;
+}
+
+function writeLog(level, message, isError = false) {
+    const logMessage = formatLogMessage(level, message);
+    
+    // Write to console
+    if (isError) {
+        console.error(logMessage.trim());
+    } else {
+        console.log(logMessage.trim());
+    }
+    
+    // Write to main log file
+    try {
+        fs.appendFileSync(logFile, logMessage, 'utf8');
+    } catch (err) {
+        console.error('Failed to write to log file:', err);
+    }
+    
+    // Write to error log file if it's an error
+    if (isError) {
+        try {
+            fs.appendFileSync(errorLogFile, logMessage, 'utf8');
+            
+            // Also write to central error file at project root
+            const simplifiedMessage = `${new Date().toISOString().replace('T', ' ').split('.')[0]} - ${level} - [FRONTEND] ${message}\n`;
+            fs.appendFileSync(centralErrorFile, simplifiedMessage, 'utf8');
+        } catch (err) {
+            console.error('Failed to write to error log file:', err);
+        }
+    }
+}
+
+function logInfo(message) {
+    writeLog('INFO', message);
+}
+
+function logError(message) {
+    writeLog('ERROR', message, true);
+}
+
+function logDebug(message) {
+    writeLog('DEBUG', message);
+}
+
+function logWarning(message) {
+    writeLog('WARNING', message);
+}
+
+// Log startup
+logInfo('='.repeat(60));
+logInfo('Electron Frontend - Démarrage');
+logInfo(`Logs sauvegardés dans: ${logsDir}`);
+logInfo(`Erreurs centralisées dans: ${centralErrorFile}`);
+logInfo(`Version Electron: ${app.getVersion()}`);
+logInfo(`Plateforme: ${process.platform}`);
+logInfo('='.repeat(60));
 
 function startBackend() {
+    logInfo('Tentative de démarrage du backend...');
+    
     if (app.isPackaged) {
         // In production, spawn the compiled backend executable
         // We will place the backend executable in resources/backend/
@@ -15,29 +93,37 @@ function startBackend() {
         const executable = process.platform === 'win32' ? 'backend.exe' : 'backend';
         const finalPath = path.join(process.resourcesPath, 'backend', executable);
 
-        console.log('Launching backend from:', finalPath);
+        logInfo(`Lancement du backend depuis: ${finalPath}`);
 
         backendProcess = spawn(finalPath, [], {
             cwd: path.dirname(finalPath)
         });
 
         backendProcess.stdout.on('data', (data) => {
-            console.log(`[Backend]: ${data}`);
+            logInfo(`[Backend]: ${data.toString().trim()}`);
         });
 
         backendProcess.stderr.on('data', (data) => {
-            console.error(`[Backend Err]: ${data}`);
+            logError(`[Backend Err]: ${data.toString().trim()}`);
+        });
+        
+        backendProcess.on('error', (error) => {
+            logError(`[Backend Process Error]: ${error.message}`);
+        });
+        
+        backendProcess.on('exit', (code, signal) => {
+            logWarning(`[Backend Process Exit]: Code=${code}, Signal=${signal}`);
         });
     } else {
         // In dev, we assume start_dev.bat launched it, OR we could launch it here.
         // For now, let's just log.
-        console.log('Development mode: Backend should be running externally.');
+        logInfo('Mode développement: Backend devrait être lancé en externe.');
     }
 }
 
 function stopBackend() {
     if (backendProcess) {
-        console.log('Stopping backend...');
+        logInfo('Arrêt du backend...');
         backendProcess.kill();
         backendProcess = null;
     }
@@ -174,6 +260,8 @@ function setupMenu(win) {
 
 
 function createWindow() {
+    logDebug('createWindow() appelé');
+    
     const win = new BrowserWindow({
         width: 1200,
         height: 800,
@@ -187,12 +275,26 @@ function createWindow() {
         icon: path.join(__dirname, '../public/favicon.ico')
     });
 
+    logDebug('BrowserWindow créée');
+
+    // Prevent window from closing accidentally
+    win.on('close', (event) => {
+        logDebug('Événement de fermeture de fenêtre');
+    });
+
+    win.on('closed', () => {
+        logDebug('Fenêtre fermée');
+    });
+
     // In development, load from Vite dev server
     if (process.env.ELECTRON_START_URL) {
+        logInfo(`Chargement depuis le serveur dev: ${process.env.ELECTRON_START_URL}`);
         win.loadURL(process.env.ELECTRON_START_URL);
     } else {
         // In production, load the local index.html
-        win.loadFile(path.join(__dirname, '../dist/index.html'));
+        const indexPath = path.join(__dirname, '../dist/index.html');
+        logInfo(`Chargement depuis le fichier: ${indexPath}`);
+        win.loadFile(indexPath);
     }
 
     // Setup Application Menu
@@ -208,13 +310,21 @@ function createWindow() {
     const { ipcMain, dialog } = require('electron');
     const fs = require('fs');
 
+    if (!ipcHandlersRegistered) {
+    ipcHandlersRegistered = true;
+
     ipcMain.handle('fs:open-folder', async () => {
+        logDebug('fs:open-folder appelé');
         const { canceled, filePaths } = await dialog.showOpenDialog(win, {
             properties: ['openDirectory']
         });
-        if (canceled) return null;
+        if (canceled) {
+            logDebug('Ouverture de dossier annulée');
+            return null;
+        }
 
         const dirPath = filePaths[0];
+        logInfo(`Ouverture du dossier: ${dirPath}`);
         
         // Recursive function to read directory tree
         const readDirRecursive = async (currentPath, relativePath = '') => {
@@ -263,31 +373,35 @@ function createWindow() {
                 return a.isDirectory ? -1 : 1;
             });
             
-            console.log('Opened folder:', dirPath);
-            console.log('Total files found:', normalizedFiles.length);
-            console.log('Sample files:', normalizedFiles.slice(0, 5));
+            logInfo(`Dossier ouvert: ${dirPath}`);
+            logInfo(`Total de fichiers trouvés: ${normalizedFiles.length}`);
             
             return { path: dirPath, files: normalizedFiles };
         } catch (err) {
-            console.error('Error opening folder:', err);
+            logError(`Erreur lors de l'ouverture du dossier: ${err.message}`);
             return null;
         }
     });
 
     ipcMain.handle('fs:read-file', async (event, filePath) => {
         try {
+            logDebug(`Lecture du fichier: ${filePath}`);
             const content = await fs.promises.readFile(filePath, 'utf-8');
             return content;
         } catch (err) {
+            logError(`Erreur lecture fichier ${filePath}: ${err.message}`);
             return null;
         }
     });
 
     ipcMain.handle('fs:save-file', async (event, filePath, content) => {
         try {
+            logDebug(`Sauvegarde du fichier: ${filePath}`);
             await fs.promises.writeFile(filePath, content, 'utf-8');
+            logInfo(`Fichier sauvegardé: ${filePath}`);
             return true;
         } catch (err) {
+            logError(`Erreur sauvegarde fichier ${filePath}: ${err.message}`);
             return false;
         }
     });
@@ -295,12 +409,18 @@ function createWindow() {
     ipcMain.handle('fs:create-file', async (event, folderPath, fileName) => {
         try {
             const filePath = path.join(folderPath, fileName);
+            logDebug(`Création du fichier: ${filePath}`);
             // Don't overwrite existing
-            if (fs.existsSync(filePath)) return { success: false, error: 'File already exists' };
+            if (fs.existsSync(filePath)) {
+                logWarning(`Le fichier existe déjà: ${filePath}`);
+                return { success: false, error: 'File already exists' };
+            }
 
             await fs.promises.writeFile(filePath, '', 'utf-8');
+            logInfo(`Fichier créé: ${filePath}`);
             return { success: true, path: filePath };
         } catch (err) {
+            logError(`Erreur création fichier: ${err.message}`);
             return { success: false, error: err.message };
         }
     });
@@ -308,18 +428,18 @@ function createWindow() {
     ipcMain.handle('fs:create-folder', async (event, folderPath, folderName) => {
         try {
             const dirPath = path.join(folderPath, folderName);
-            console.log(`Creating folder at: ${dirPath}`); // Debug log
+            logDebug(`Création du dossier: ${dirPath}`);
 
             if (fs.existsSync(dirPath)) {
-                console.log('Folder already exists');
+                logWarning(`Le dossier existe déjà: ${dirPath}`);
                 return { success: false, error: 'Folder already exists' };
             }
 
             await fs.promises.mkdir(dirPath, { recursive: true });
-            console.log('Folder created successfully');
+            logInfo(`Dossier créé: ${dirPath}`);
             return { success: true, path: dirPath };
         } catch (err) {
-            console.error('Error creating folder:', err);
+            logError(`Erreur création dossier: ${err.message}`);
             return { success: false, error: err.message };
         }
     });
@@ -357,21 +477,56 @@ function createWindow() {
         }
     });
 
-    // Open DevTools in dev mode
-    win.webContents.openDevTools();
+    }
+
+    // Open DevTools in dev mode only
+    if (!app.isPackaged) {
+        logDebug('Ouverture des DevTools (mode dev)');
+        win.webContents.openDevTools();
+    }
+    
+    // Log when page finishes loading
+    win.webContents.on('did-finish-load', () => {
+        logInfo('Page chargée avec succès');
+    });
+    
+    win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        logError(`Échec du chargement de la page: ${errorCode} - ${errorDescription}`);
+    });
+    
+    logDebug('createWindow() terminé');
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    logInfo('Application Electron prête');
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
+    logDebug('Toutes les fenêtres fermées');
     stopBackend();
     if (process.platform !== 'darwin') {
+        logInfo('Fermeture de l\'application (non-macOS)');
         app.quit();
     }
 });
 
 app.on('activate', () => {
+    logDebug('Application activée');
     if (BrowserWindow.getAllWindows().length === 0) {
+        logDebug('Aucune fenêtre, création d\'une nouvelle fenêtre');
         createWindow();
     }
+});
+
+app.on('before-quit', () => {
+    logInfo('Application sur le point de se fermer');
+});
+
+app.on('will-quit', () => {
+    logInfo('Application va se fermer');
+});
+
+app.on('quit', () => {
+    logInfo('Application fermée');
 });

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Camera, ChevronLeft, ChevronRight, Cpu, Send, Sparkles, Wrench } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Cpu, Send, Sparkles, Wrench, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ToolCallDisplay from './ToolCallDisplay';
@@ -7,40 +7,166 @@ import ToolCallDisplay from './ToolCallDisplay';
 const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, currentFile, currentCode, fileTree }) => {
     const { t } = useTranslation();
     const [input, setInput] = useState('');
-    const [provider, setProvider] = useState('openrouter'); // 'openrouter' or 'gemini'
-    const [enableTools, setEnableTools] = useState(true); // Enable tool calling
-    const [includeProjectContext, setIncludeProjectContext] = useState(false); // Include all project files
+    const [provider, setProvider] = useState('openrouter');
+    const [enableTools, setEnableTools] = useState(true);
+    const [includeProjectContext, setIncludeProjectContext] = useState(false);
     const [messages, setMessages] = useState([
         { role: 'assistant', content: t('aiGreeting') }
     ]);
     const [loading, setLoading] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     
+    // File mention (@) autocomplete state
+    const [showFileSuggestions, setShowFileSuggestions] = useState(false);
+    const [fileSuggestions, setFileSuggestions] = useState([]);
+    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+    const [mentionedFiles, setMentionedFiles] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const inputRef = useRef(null);
+    const suggestionsRef = useRef(null);
+    
     // Automatic analysis state
     const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(() => {
         const stored = localStorage.getItem('autoAnalysisEnabled');
-        return stored !== null ? JSON.parse(stored) : true; // Default to enabled
+        return stored !== null ? JSON.parse(stored) : true;
     });
     const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
     const debounceTimerRef = useRef(null);
     const previousFileRef = useRef(null);
     const previousCodeRef = useRef(null);
 
+    // Filter files based on search query
+    const filterFiles = (query) => {
+        if (!fileTree || !fileTree.files) {
+            console.log('[FILE MENTION] No fileTree available');
+            setFileSuggestions([]);
+            return;
+        }
+        
+        const allFiles = fileTree.files.filter(f => !f.isDirectory);
+        console.log('[FILE MENTION] Total files:', allFiles.length);
+        
+        if (!query) {
+            const suggestions = allFiles.slice(0, 10);
+            console.log('[FILE MENTION] Showing', suggestions.length, 'files');
+            setFileSuggestions(suggestions);
+            setSelectedSuggestionIndex(0);
+            return;
+        }
+        
+        const lowerQuery = query.toLowerCase();
+        const filtered = allFiles.filter(file => {
+            const fileName = file.name.toLowerCase();
+            const filePath = file.path.toLowerCase();
+            return fileName.includes(lowerQuery) || filePath.includes(lowerQuery);
+        });
+        
+        console.log('[FILE MENTION] Filtered to', filtered.length, 'files for query:', query);
+        setFileSuggestions(filtered.slice(0, 10));
+        setSelectedSuggestionIndex(0);
+    };
+
+    // Handle input change with @ detection
+    const handleInputChange = (e) => {
+        const value = e.target.value;
+        setInput(value);
+        
+        const cursorPos = e.target.selectionStart;
+        const textBeforeCursor = value.substring(0, cursorPos);
+        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+        
+        console.log('[FILE MENTION] Input changed:', { value, cursorPos, lastAtIndex });
+        
+        if (lastAtIndex !== -1) {
+            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+            
+            if (!textAfterAt.includes(' ')) {
+                console.log('[FILE MENTION] @ detected, query:', textAfterAt);
+                setSearchQuery(textAfterAt);
+                setShowFileSuggestions(true);
+                filterFiles(textAfterAt);
+            } else {
+                console.log('[FILE MENTION] Space after @, hiding suggestions');
+                setShowFileSuggestions(false);
+            }
+        } else {
+            setShowFileSuggestions(false);
+        }
+    };
+
+    // Select a file from suggestions
+    const selectFile = (file) => {
+        if (!mentionedFiles.find(f => f.path === file.path)) {
+            setMentionedFiles(prev => [...prev, file]);
+        }
+        
+        const cursorPos = inputRef.current.selectionStart;
+        const textBeforeCursor = input.substring(0, cursorPos);
+        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+        
+        const newInput = input.substring(0, lastAtIndex) + input.substring(cursorPos);
+        setInput(newInput.trim());
+        
+        setShowFileSuggestions(false);
+        setSearchQuery('');
+        
+        setTimeout(() => inputRef.current?.focus(), 0);
+    };
+
+    // Handle keyboard navigation
+    const handleKeyDown = (e) => {
+        if (!showFileSuggestions) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+            return;
+        }
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev => 
+                Math.min(prev + 1, fileSuggestions.length - 1)
+            );
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (fileSuggestions[selectedSuggestionIndex]) {
+                selectFile(fileSuggestions[selectedSuggestionIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            setShowFileSuggestions(false);
+        }
+    };
+
+    // Remove a mentioned file
+    const removeMentionedFile = (index) => {
+        setMentionedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
     const sendMessage = async () => {
-        if (!input.trim()) return;
-        const userMsg = { role: 'user', content: input };
+        if (!input.trim() && mentionedFiles.length === 0) return;
+        
+        const mentionedFilesCopy = [...mentionedFiles];
+        const userMsg = { 
+            role: 'user', 
+            content: input,
+            mentionedFiles: mentionedFilesCopy
+        };
+        
         setMessages(prev => [...prev, userMsg]);
         setInput('');
+        setMentionedFiles([]);
         setLoading(true);
 
         try {
-            // Get workspace path from Electron API
             let workspacePath = null;
             if (window.api && window.api.getWorkspacePath) {
                 workspacePath = await window.api.getWorkspacePath();
             }
             
-            // Prepare context with current file info
             const context = {
                 current_file: currentFile ? {
                     name: currentFile.name,
@@ -49,7 +175,26 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 } : null
             };
             
-            // Add project files if requested
+            // Add mentioned files to context
+            if (mentionedFilesCopy.length > 0) {
+                context.mentioned_files = [];
+                for (const file of mentionedFilesCopy) {
+                    try {
+                        if (window.api && window.api.readFile) {
+                            const fullPath = fileTree.path + '/' + file.path;
+                            const content = await window.api.readFile(fullPath);
+                            context.mentioned_files.push({
+                                name: file.name,
+                                path: file.path,
+                                content: content
+                            });
+                        }
+                    } catch (err) {
+                        console.error(`Failed to read mentioned file ${file.name}:`, err);
+                    }
+                }
+            }
+            
             if (includeProjectContext && fileTree) {
                 context.project_files = fileTree.files.map(file => ({
                     name: file.name,
@@ -59,7 +204,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 context.workspace_path = fileTree.path;
             }
             
-            // Call Backend API with provider, history, and tool calling
             const res = await axios.post('http://localhost:8001/ai/generate', { 
                 prompt: input,
                 provider: provider,
@@ -81,7 +225,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 tool_results: res.data.tool_results || []
             };
             
-            // Auto-apply tool results to editor
             if (aiMsg.tool_results && aiMsg.tool_results.length > 0) {
                 for (const result of aiMsg.tool_results) {
                     if (result.result.status === 'success') {
@@ -100,7 +243,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
         setLoading(false);
     };
     
-    // Automatic analysis function
     const triggerAutoAnalysis = async () => {
         if (!autoAnalysisEnabled || !currentFile || !currentCode) {
             return;
@@ -109,13 +251,11 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
         setIsAutoAnalyzing(true);
         
         try {
-            // Get workspace path from Electron API
             let workspacePath = null;
             if (window.api && window.api.getWorkspacePath) {
                 workspacePath = await window.api.getWorkspacePath();
             }
             
-            // Prepare context with current file info
             const context = {
                 current_file: {
                     name: currentFile.name,
@@ -124,7 +264,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 }
             };
             
-            // Call Backend API with analyze_code tool request
             const res = await axios.post('http://localhost:8001/ai/generate', { 
                 prompt: 'Analyze this code for issues',
                 provider: provider,
@@ -144,104 +283,85 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                 isAutoAnalysis: true
             };
             
-            // Only add to messages if there are findings
             if (aiMsg.tool_results && aiMsg.tool_results.length > 0) {
                 setMessages(prev => [...prev, aiMsg]);
             }
         } catch (err) {
             console.error('Auto-analysis error:', err);
-            // Don't show error to user for automatic analysis
         }
         
         setIsAutoAnalyzing(false);
     };
     
     const handleToolResult = async (toolCall, result) => {
-        // Auto-apply file operations to the editor
         switch (toolCall.tool) {
             case 'create_file':
-                // Open the newly created file in editor
                 if (result.path && toolCall.parameters.content) {
                     await onOpenFile(result.path);
-                    // The file is already created by backend, just open it
                 }
                 break;
                 
             case 'modify_file':
             case 'smart_modify_file':
-                // Reload the modified file if it's currently open
                 if (result.path) {
                     await onFileModified(result.path);
                 }
                 break;
                 
             case 'rename_file':
-                // Handle file rename
                 if (result.new_path) {
                     await onFileModified(result.new_path);
                 }
                 break;
                 
             default:
-                // Other tools don't need editor updates
                 break;
         }
     };
     
-    // Store auto-analysis preference in localStorage
     useEffect(() => {
         localStorage.setItem('autoAnalysisEnabled', JSON.stringify(autoAnalysisEnabled));
     }, [autoAnalysisEnabled]);
     
-    // Detect file open events
     useEffect(() => {
         if (!currentFile || !autoAnalysisEnabled) {
             return;
         }
         
-        // Check if file has changed (file open event)
         if (previousFileRef.current?.path !== currentFile.path) {
             previousFileRef.current = currentFile;
             previousCodeRef.current = currentCode;
             
-            // Clear any existing debounce timer
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
             }
             
-            // Trigger analysis after 2 second debounce
             debounceTimerRef.current = setTimeout(() => {
                 triggerAutoAnalysis();
             }, 2000);
         }
     }, [currentFile, autoAnalysisEnabled]);
     
-    // Detect file save events (code changes)
     useEffect(() => {
         if (!currentFile || !autoAnalysisEnabled) {
             return;
         }
         
-        // Check if code has changed significantly (not just typing)
-        // We detect "save" by checking if code changed but file path stayed the same
         if (previousFileRef.current?.path === currentFile.path && 
             previousCodeRef.current !== currentCode) {
             
             previousCodeRef.current = currentCode;
             
-            // Clear any existing debounce timer
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
             }
             
-            // Trigger analysis after 2 second debounce
             debounceTimerRef.current = setTimeout(() => {
                 triggerAutoAnalysis();
             }, 2000);
         }
     }, [currentCode, currentFile, autoAnalysisEnabled]);
     
-    // Cleanup debounce timer on unmount
     useEffect(() => {
         return () => {
             if (debounceTimerRef.current) {
@@ -250,9 +370,33 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
         };
     }, []);
 
+    // Get file icon based on extension
+    const getFileIcon = (fileName) => {
+        if (fileName.endsWith('.ino')) return '🔧';
+        if (fileName.endsWith('.h')) return '📋';
+        if (fileName.endsWith('.cpp')) return '⚙️';
+        if (fileName.endsWith('.c')) return '⚙️';
+        return '📄';
+    };
+
+    // Get just the filename from a path
+    const getFileName = (filePath) => {
+        if (!filePath) return '';
+        // Handle both forward and backward slashes
+        const parts = filePath.split(/[/\\]/);
+        return parts[parts.length - 1];
+    };
+
+    // Get directory path from full path
+    const getDirectoryPath = (filePath) => {
+        if (!filePath) return '';
+        const parts = filePath.split(/[/\\]/);
+        if (parts.length <= 1) return filePath;
+        return parts.slice(0, -1).join('/');
+    };
+
     return (
         <div className={`ai-panel ${isMinimized ? 'ai-panel-minimized' : ''}`}>
-            {/* Minimize Toggle Button */}
             <button 
                 className="ai-panel-toggle"
                 onClick={() => setIsMinimized(!isMinimized)}
@@ -263,7 +407,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
 
             {!isMinimized && (
                 <>
-                    {/* Header */}
                     <div className="ai-panel-header">
                         <div className="ai-panel-title">
                             <Sparkles size={18} className="ai-icon-glow" />
@@ -275,7 +418,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                             )}
                         </div>
                         
-                        {/* Provider Selector & Tools Toggle */}
                         <div className="ai-provider-selector">
                             <span className="provider-label">Model:</span>
                             <select 
@@ -296,7 +438,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         </div>
                     </div>
                     
-                    {/* Auto-Analysis Toggle */}
                     <div className="ai-auto-analysis-toggle">
                         <label className="auto-analysis-label">
                             <input 
@@ -311,7 +452,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         </label>
                     </div>
                     
-                    {/* Project Context Toggle */}
                     {fileTree && (
                         <div className="ai-context-toggle">
                             <label className="context-toggle-label">
@@ -328,11 +468,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         </div>
                     )}
                     
-                    {/* Header continuation */}
-                    <div style={{ display: 'none' }}>
-                    </div>
-                    
-                    {/* Current File Indicator */}
                     {currentFile && (
                         <div className="ai-current-file">
                             <div className="current-file-icon">📄</div>
@@ -343,11 +478,9 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         </div>
                     )}
 
-                    {/* Messages */}
                     <div className="ai-messages-container">
                         {messages.map((msg, i) => (
                             <div key={i} className={`ai-message ${msg.role === 'user' ? 'ai-message-user' : 'ai-message-assistant'}`}>
-                                {/* Avatar */}
                                 <div className="ai-message-avatar">
                                     {msg.role === 'user' ? (
                                         <div className="avatar-user">U</div>
@@ -356,13 +489,25 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                     )}
                                 </div>
 
-                                {/* Content */}
                                 <div className="ai-message-content">
+                                    {msg.mentionedFiles && msg.mentionedFiles.length > 0 && (
+                                        <div className="message-mentioned-files">
+                                            <div className="message-mentioned-files-label">
+                                                📎 Fichiers joints:
+                                            </div>
+                                            {msg.mentionedFiles.map((file, idx) => (
+                                                <div key={idx} className="message-mentioned-file">
+                                                    <span className="message-file-icon">{getFileIcon(file.name)}</span>
+                                                    <span className="message-file-name">{getFileName(file.name)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
                                     <div className="ai-message-bubble">
                                         {msg.content}
                                     </div>
 
-                                    {/* Tool Calls Display */}
                                     {msg.tool_calls && msg.tool_calls.length > 0 && (
                                         <div className="ai-tool-calls">
                                             {msg.tool_calls.map((toolCall, idx) => (
@@ -376,7 +521,6 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                         </div>
                                     )}
 
-                                    {/* Code Block - Only show if no tool calls were made (for new file generation) */}
                                     {msg.code && (!msg.tool_calls || msg.tool_calls.length === 0) && (
                                         <div className="ai-code-block">
                                             <div className="ai-code-header">
@@ -414,14 +558,71 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                         )}
                     </div>
 
-                    {/* Input */}
                     <div className="ai-input-container">
+                        {mentionedFiles.length > 0 && (
+                            <div className="mentioned-files-container">
+                                {mentionedFiles.map((file, idx) => (
+                                    <div key={idx} className="mentioned-file-pill">
+                                        <span className="mentioned-file-icon">{getFileIcon(file.name)}</span>
+                                        <span className="mentioned-file-name">{getFileName(file.name)}</span>
+                                        <button 
+                                            className="mentioned-file-remove"
+                                            onClick={() => removeMentionedFile(idx)}
+                                            title="Remove file"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        
                         <div className="ai-input-wrapper">
+                            {showFileSuggestions && (
+                                <div className="file-suggestions-dropdown" ref={suggestionsRef}>
+                                    <div className="file-suggestions-header">
+                                        <span>📁 Fichiers ({fileSuggestions.length})</span>
+                                    </div>
+                                    {!fileTree ? (
+                                        <div className="file-suggestions-empty">
+                                            Ouvrez un dossier pour voir les fichiers
+                                        </div>
+                                    ) : fileSuggestions.length === 0 ? (
+                                        <div className="file-suggestions-empty">
+                                            Aucun fichier trouvé
+                                        </div>
+                                    ) : (
+                                        fileSuggestions.map((file, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`file-suggestion-item ${
+                                                    idx === selectedSuggestionIndex ? 'selected' : ''
+                                                }`}
+                                                onClick={() => selectFile(file)}
+                                                onMouseEnter={() => setSelectedSuggestionIndex(idx)}
+                                            >
+                                                <span className="file-suggestion-icon">
+                                                    {getFileIcon(file.name)}
+                                                </span>
+                                                <div className="file-suggestion-info">
+                                                    <div className="file-suggestion-name">{getFileName(file.name)}</div>
+                                                    <div className="file-suggestion-path">{getDirectoryPath(file.path)}</div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                    <div className="file-suggestions-hint">
+                                        ↑↓ pour naviguer • Enter pour sélectionner • Esc pour fermer
+                                    </div>
+                                </div>
+                            )}
+                            
                             <input
+                                ref={inputRef}
                                 value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                                placeholder={`Ask ${provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} anything...`}
+                                onChange={handleInputChange}
+                                onKeyDown={handleKeyDown}
+                                placeholder={`Tapez @ pour mentionner un fichier...`}
                                 className="ai-input"
                             />
                             <div className="ai-input-actions">
@@ -436,7 +637,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
                                     onClick={sendMessage} 
                                     className="ai-input-btn ai-send-btn" 
                                     title="Send"
-                                    disabled={!input.trim()}
+                                    disabled={!input.trim() && mentionedFiles.length === 0}
                                 >
                                     <Send size={16} />
                                 </button>

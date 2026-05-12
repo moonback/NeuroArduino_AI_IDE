@@ -1,43 +1,43 @@
 @echo off
 echo ==========================================
-echo   Starting AI NeuroArduino IDE
+echo   Demarrage de l'IDE AI NeuroArduino
 echo ==========================================
 
 cd /d "%~dp0"
 
-echo [1/3] Checking Backend Dependencies...
+echo [1/3] Verification des dependances Backend...
 cd backend
 if not exist ".installed" (
-    echo Installing backend requirements...
+    echo Installation des dependances backend...
     pip install -r requirements.txt
     if errorlevel 1 (
-        echo Failed to install backend dependencies.
+        echo Echec de l'installation des dependances backend.
         pause
         exit /b %errorlevel%
     )
     echo. > .installed
 ) else (
-    echo Backend dependencies already installed. (Delete backend/.installed to reinstall)
+    echo Dependances backend deja installees. (Supprimer backend/.installed pour reinstaller)
 )
 cd ..
 
-echo [2/3] Checking Frontend Dependencies...
+echo [2/3] Verification des dependances Frontend...
 cd frontend
 if not exist "node_modules" (
-    echo Node modules not found. Installing dependencies...
+    echo Modules Node non trouves. Installation des dependances...
     call npm install
 )
 cd ..
 
-echo [3/3] Launching Services...
+echo [3/3] Lancement des services...
 echo.
-echo Launching Backend (Port 8001)...
-start "AI Arduino Backend" cmd /k "cd backend && python -m uvicorn main:app --port 8001 --reload"
+echo Lancement du Backend (Port 8001)...
+start "Backend AI Arduino" cmd /k "cd backend && python -m uvicorn main:app --port 8001 --reload"
 
-echo Launching Frontend (Electron)...
-start "AI Arduino Frontend" cmd /k "cd frontend && npm run electron:dev"
+echo Lancement du Frontend (Electron)...
+start "Frontend AI Arduino" cmd /k "cd frontend && npm run electron:dev"
 
 echo.
-echo Success! Electron app is starting...
+echo Succes ! L'application Electron demarre...
 echo.
 pause
