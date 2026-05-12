@@ -1,56 +1,56 @@
 @echo off
 echo ==========================================
-echo   Building AI Arduino IDE for Distribution
+echo   Compilation de l'IDE AI Arduino pour Distribution
 echo ==========================================
 echo.
 
 cd /d "%~dp0"
 
-echo [1/4] Installing Backend Build Tools (PyInstaller)...
+echo [1/4] Installation des outils de compilation Backend (PyInstaller)...
 cd backend
 pip install -r requirements.txt
 if errorlevel 1 (
-    echo Failed to install backend dependencies.
+    echo Echec de l'installation des dependances backend.
     pause
     exit /b %errorlevel%
 )
 cd ..
 
 echo.
-echo [2/4] Installing Frontend Dependencies...
+echo [2/4] Installation des dependances Frontend...
 cd frontend
 call npm install
 if errorlevel 1 (
-    echo Failed to install frontend dependencies.
+    echo Echec de l'installation des dependances frontend.
     pause
     exit /b %errorlevel%
 )
 cd ..
 
 echo.
-echo [3/4] Building Application...
-echo This process will:
-echo  1. Compile Python backend to a single executable (dist/backend.exe)
-echo  2. Build React Frontend
-echo  3. Package Electron App
+echo [3/4] Compilation de l'application...
+echo Ce processus va :
+echo  1. Compiler le backend Python en un executable unique (dist/backend.exe)
+echo  2. Compiler le Frontend React
+echo  3. Empaqueter l'application Electron
 echo.
-echo This may take a few minutes...
+echo Cela peut prendre quelques minutes...
 echo.
 
 cd frontend
 call npm run package:win
 if errorlevel 1 (
-    echo Build Failed!
+    echo Echec de la compilation !
     pause
     exit /b %errorlevel%
 )
 
 echo.
 echo ==========================================
-echo   BUILD SUCCESSFUL!
+echo   COMPILATION REUSSIE !
 echo ==========================================
 echo.
-echo Installer can be found in:
+echo L'installateur se trouve dans :
 echo   frontend\dist_app\
 echo.
 pause
