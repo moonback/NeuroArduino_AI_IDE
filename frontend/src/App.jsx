@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api, { buildWsUrl } from './api';
 import { Activity, Camera, Cpu, FilePlus, ListFilter, Package, PlugZap, RefreshCw, Save, Settings as SettingsIcon, Sparkles, Terminal as TerminalIcon, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -74,7 +74,7 @@ function App() {
   const refreshPorts = async () => {
     addLog('Scanning for ports (Backend)...', 'info');
     try {
-      const res = await axios.get('http://localhost:8001/ports');
+      const res = await api.get('/ports');
       const availablePorts = res.data.map(p => ({ path: p.device, manufacturer: p.description }));
       setPorts(availablePorts);
       addLog(`Found ${availablePorts.length} ports via backend.`, 'success');
@@ -94,7 +94,7 @@ function App() {
 
   const fetchBoards = async () => {
     try {
-      const res = await axios.get('http://localhost:8001/boards/listall');
+      const res = await api.get('/boards/listall');
       const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
       if (data && data.boards) {
         const boardList = data.boards.map(b => ({ name: b.name, fqbn: b.fqbn }));
@@ -114,7 +114,7 @@ function App() {
     if (isConnected) {
       // Disconnect
       try {
-        await axios.post('http://localhost:8001/serial/disconnect');
+        await api.post('/serial/disconnect');
         if (wsRef.current) wsRef.current.close();
         setIsConnected(false);
         addLog('Disconnected from ' + selectedPort, 'info');
@@ -125,7 +125,7 @@ function App() {
       // Connect
       addLog(`Connecting to ${selectedPort} at ${baudRate} baud...`, 'info');
       try {
-        const res = await axios.post('http://localhost:8001/serial/connect', {
+        const res = await api.post('/serial/connect', {
           path: selectedPort,
           baudrate: baudRate
         });
@@ -136,7 +136,7 @@ function App() {
           setActiveTab('serial');
 
           // Initialize WebSocket
-          const ws = new WebSocket('ws://localhost:8001/ws/monitor');
+          const ws = new WebSocket(buildWsUrl('/ws/monitor'));
           ws.onmessage = (event) => {
             addLog(event.data, 'serial');
           };
@@ -172,7 +172,7 @@ function App() {
     addLog('Compiling...', 'info');
     setActiveTab('terminal');
     try {
-      const res = await axios.post('http://localhost:8001/compile', { code, board });
+      const res = await api.post('/compile', { code, board });
       addLog(res.data.message, 'success');
     } catch (err) {
       const msg = err.response?.data?.detail || 'Compilation Failed';
@@ -196,7 +196,7 @@ function App() {
 
     addLog('Uploading...', 'info');
     try {
-      const res = await axios.post('http://localhost:8001/upload', { code, board, port: selectedPort });
+      const res = await api.post('/upload', { code, board, port: selectedPort });
       addLog(res.data.message, 'success');
     } catch (err) {
       const msg = err.response?.data?.detail || 'Upload Failed';
@@ -249,7 +249,7 @@ function App() {
         if (content !== null) {
           initialCodeRef.current = content;
           setCode(content);
-          setCurrentFile({ ...file, fullPath });
+          setCurrentFile({ ...file, relativePath: file.path, fullPath });
           setIsDirty(false);
           addLog(`Opened file: ${file.name}`, 'info');
         } else {
@@ -415,7 +415,7 @@ function App() {
       return;
     }
     try {
-      await axios.post('http://localhost:8001/serial/write', { data });
+      await api.post('/serial/write', { data });
       addLog(`> ${data}`, 'info');
     } catch (err) {
       addLog(`Error sending: ${err.message}`, 'error');

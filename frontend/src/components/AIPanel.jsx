@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../api';
 import { Camera, ChevronLeft, ChevronRight, Cpu, Send, Sparkles, Wrench } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +44,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
             const context = {
                 current_file: currentFile ? {
                     name: currentFile.name,
-                    path: currentFile.path,
+                    path: currentFile.relativePath || currentFile.path,
                     content: currentCode
                 } : null
             };
@@ -60,7 +60,7 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
             }
             
             // Call Backend API with provider, history, and tool calling
-            const res = await axios.post('http://localhost:8001/ai/generate', { 
+            const res = await api.post('/ai/generate', { 
                 prompt: input,
                 provider: provider,
                 enable_tools: enableTools,
@@ -119,13 +119,13 @@ const AIPanel = ({ onApplyCode, onOpenVision, onOpenFile, onFileModified, curren
             const context = {
                 current_file: {
                     name: currentFile.name,
-                    path: currentFile.path,
+                    path: currentFile.relativePath || currentFile.path,
                     content: currentCode
                 }
             };
             
             // Call Backend API with analyze_code tool request
-            const res = await axios.post('http://localhost:8001/ai/generate', { 
+            const res = await api.post('/ai/generate', { 
                 prompt: 'Analyze this code for issues',
                 provider: provider,
                 enable_tools: true,

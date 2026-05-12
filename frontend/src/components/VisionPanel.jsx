@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Camera, Upload, X, Sparkles, Eye, Cpu, Zap, RefreshCw, Copy, Check, ImagePlus } from 'lucide-react';
-import axios from 'axios';
+import api from '../api';
 import { useTranslation } from 'react-i18next';
 
 const VisionPanel = ({ onApplyCode, onClose }) => {
@@ -84,7 +84,7 @@ const VisionPanel = ({ onApplyCode, onClose }) => {
         setResult(null);
 
         try {
-            const res = await axios.post('http://localhost:8001/ai/vision', {
+            const res = await api.post('/ai/vision', {
                 image_data: image.src,
                 prompt: additionalPrompt || '',
                 board: 'arduino:avr:uno'

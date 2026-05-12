@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Download, CheckCircle, Package, Loader2 } from 'lucide-react';
-import axios from 'axios';
+import api from '../api';
 import { useTranslation } from 'react-i18next';
 
 const LibraryManager = ({ onClose }) => {
@@ -13,7 +13,7 @@ const LibraryManager = ({ onClose }) => {
 
     const fetchInstalled = async () => {
         try {
-            const res = await axios.get('http://localhost:8001/libraries/installed');
+            const res = await api.get('/libraries/installed');
             const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setInstalled(data?.libraries || []);
         } catch (err) {
@@ -29,7 +29,7 @@ const LibraryManager = ({ onClose }) => {
         if (!query.trim()) return;
         setLoading(true);
         try {
-            const res = await axios.get(`http://localhost:8001/libraries/search?query=${query}`);
+            const res = await api.get(`/libraries/search?query=${query}`);
             const data = (typeof res.data === 'string' && res.data.trim()) ? JSON.parse(res.data) : res.data;
             setLibraries(data?.libraries || []);
         } catch (err) {
@@ -41,7 +41,7 @@ const LibraryManager = ({ onClose }) => {
     const handleInstall = async (libName) => {
         setInstalling(libName);
         try {
-            await axios.post('http://localhost:8001/libraries/install', { name: libName });
+            await api.post('/libraries/install', { name: libName });
             await fetchInstalled();
             alert(`${libName} ${t('installSuccess')}`);
         } catch (err) {
