@@ -13,6 +13,9 @@ from typing import Optional, List, Dict
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from agents import process_ai_request, process_vision_request
 
+# Import Logger
+from logger_config import app_logger, log_request, log_error, log_tool_call, log_ai_request
+
 def get_cli_path():
     # Detect if we are running in a PyInstaller bundle
     if getattr(sys, 'frozen', False):
@@ -82,6 +85,7 @@ class VisionQuery(BaseModel):
 
 @app.get("/")
 def read_root():
+    app_logger.info("Health check endpoint called")
     return {"status": "Aireduino Backend Online"}
 
 @app.post("/api/keys")
@@ -90,6 +94,8 @@ async def update_api_keys(payload: Dict[str, str]):
     Update API keys in the .env file.
     Accepts: { openrouter_api_key: str, gemini_api_key: str }
     """
+    log_request("/api/keys", "POST", {"keys": list(payload.keys())})
+    
     allowed_keys = {
         "openrouter_api_key": "OPENROUTER_API_KEY",
         "gemini_api_key": "GEMINI_API_KEY",
@@ -121,6 +127,7 @@ async def update_api_keys(payload: Dict[str, str]):
             updated.append(env_var)
 
     if not updated:
+        app_logger.warning("No valid keys provided in update request")
         raise HTTPException(status_code=400, detail="No valid keys provided.")
 
     # Write back .env
@@ -137,10 +144,11 @@ async def update_api_keys(payload: Dict[str, str]):
         import importlib
         import agents as agents_module
         importlib.reload(agents_module)
-        print(f"[INFO] agents.py reloaded after key update: {updated}")
+        app_logger.info(f"agents.py reloaded after key update: {updated}")
     except Exception as e:
-        print(f"[WARNING] Could not reload agents: {e}")
+        app_logger.warning(f"Could not reload agents: {e}")
 
+    app_logger.info(f"API keys updated successfully: {', '.join(updated)}")
     return {
         "status": "success",
         "message": f"Updated and applied: {', '.join(updated)}",
@@ -149,6 +157,7 @@ async def update_api_keys(payload: Dict[str, str]):
 
 @app.get("/ports")
 def get_ports():
+    log_request("/ports", "GET")
     try:
         import serial.tools.list_ports
         ports = serial.tools.list_ports.comports()
@@ -156,12 +165,16 @@ def get_ports():
         # Always return a mock port if empty for demo
         if not data:
             data = [{"device": "MOCK_COM3", "description": "Arduino Uno (Simulated)"}]
+        app_logger.info(f"Found {len(data)} serial ports")
         return data
-    except ImportError:
+    except ImportError as e:
+        log_error(e, "get_ports - ImportError")
         return [{"device": "MOCK_COM3", "description": "Arduino Uno (Mock)"}]
 
 @app.post("/compile")
 async def compile_sketch(sketch: Sketch):
+    log_request("/compile", "POST", {"board": sketch.board, "code_length": len(sketch.code)})
+    
     # Create temp directory
     with tempfile.TemporaryDirectory() as temp_dir:
         # Arduino CLI requires folder name = sketch name
@@ -178,26 +191,31 @@ async def compile_sketch(sketch: Sketch):
         # Command: arduino-cli compile --fqbn {board} {sketch_path}
         # Determine CLI path
         cli_path = get_cli_path()
-        print(f"Using CLI: {cli_path}")
+        app_logger.info(f"Using CLI: {cli_path}")
 
         try:
             cmd = [cli_path, "compile", "--fqbn", sketch.board, sketch_path]
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
-                print(f"Compile Error: {result.stderr}")
+                app_logger.error(f"Compile Error: {result.stderr}")
                 raise HTTPException(status_code=400, detail=f"Compilation Failed:\n{result.stderr}")
             
+            app_logger.info("Sketch compiled successfully")
             return {"status": "success", "message": "Sketch compiled successfully!"}
             
-        except FileNotFoundError:
+        except FileNotFoundError as e:
              # Fallback for dev/demo if CLI not installed
+             log_error(e, "compile_sketch - CLI not found")
              return {"status": "warning", "message": "Arduino CLI not found. Mode: Simulation."}
 
 
 @app.post("/upload")
 async def upload_sketch(sketch: Sketch):
+    log_request("/upload", "POST", {"board": sketch.board, "port": sketch.port})
+    
     if not sketch.port:
+        app_logger.warning("Upload attempted without port")
         raise HTTPException(status_code=400, detail="Port required for upload")
     
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -213,7 +231,7 @@ async def upload_sketch(sketch: Sketch):
         try:
             # Determine CLI path
             cli_path = get_cli_path()
-            print(f"Using CLI: {cli_path}")
+            app_logger.info(f"Using CLI: {cli_path}")
 
             # Command: arduino-cli compile --upload -p {port} --fqbn {board} {sketch_path}
             # We use compile --upload because the temp dir is fresh and has no previous build artifacts
@@ -221,12 +239,14 @@ async def upload_sketch(sketch: Sketch):
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
-                print(f"Upload Error: {result.stderr}")
+                app_logger.error(f"Upload Error: {result.stderr}")
                 raise HTTPException(status_code=400, detail=f"Upload Failed:\n{result.stderr}")
                 
+            app_logger.info(f"Sketch uploaded successfully to {sketch.port}")
             return {"status": "success", "message": "Sketch uploaded successfully!"}
             
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+             log_error(e, "upload_sketch - CLI not found")
              return {"status": "warning", "message": "Arduino CLI not found. Mode: Simulation."}
 
 
@@ -336,12 +356,18 @@ async def list_all_supported_boards():
 
 @app.post("/ai/generate")
 async def generate_code(query: AIQuery):
+    log_request("/ai/generate", "POST", {
+        "provider": query.provider,
+        "board": query.board,
+        "enable_tools": query.enable_tools,
+        "prompt_length": len(query.prompt)
+    })
+    
     # Use workspace path if provided, otherwise use current directory
     workspace = query.workspace_path or os.getcwd()
     
-    print(f"[DEBUG] Workspace path: {workspace}")
-    # print(f"[DEBUG] Context: {query.context}") # Removed to prevent UnicodeEncodeError
-    print(f"[DEBUG] Enable tools: {query.enable_tools}")
+    app_logger.debug(f"Workspace path: {workspace}")
+    app_logger.debug(f"Enable tools: {query.enable_tools}")
     
     try:
         # Create agent with workspace (inside try/except to catch init errors)
@@ -358,9 +384,8 @@ async def generate_code(query: AIQuery):
             # Use full path for file operations
             file_full_path = os.path.join(workspace, current_file['path']) if workspace else current_file['path']
             
-            print(f"[DEBUG] Current file: {current_file['name']}")
-            print(f"[DEBUG] File path: {current_file['path']}")
-            print(f"[DEBUG] Full path: {file_full_path}")
+            app_logger.debug(f"Current file: {current_file['name']}")
+            app_logger.debug(f"File path: {current_file['path']}")
             
             context_parts.append(f"[CURRENT FILE: '{current_file['name']}' at '{current_file['path']}']")
             if current_file.get('content'):
@@ -369,11 +394,11 @@ async def generate_code(query: AIQuery):
         # Add mentioned files context (@mentions)
         if query.context and query.context.get('mentioned_files'):
             mentioned_files = query.context['mentioned_files']
-            print(f"[DEBUG] Mentioned files: {len(mentioned_files)}")
+            app_logger.debug(f"Mentioned files: {len(mentioned_files)}")
             
             mentioned_context = []
             for file_info in mentioned_files:
-                print(f"[DEBUG] Processing mentioned file: {file_info['name']}")
+                app_logger.debug(f"Processing mentioned file: {file_info['name']}")
                 mentioned_context.append(f"\n--- @Mentioned File: {file_info['name']} ({file_info['path']}) ---")
                 if file_info.get('content'):
                     mentioned_context.append(f"```cpp\n{file_info['content']}\n```")
@@ -402,7 +427,7 @@ async def generate_code(query: AIQuery):
                             else:
                                 project_context.append(f"\n--- File: {file_info['path']} (truncated) ---\n{content[:2000]}...\n[File truncated]")
                     except Exception as e:
-                        print(f"Error reading file {file_info['path']}: {e}")
+                        app_logger.error(f"Error reading file {file_info['path']}: {e}")
             
             if project_context:
                 context_parts.append(f"\n[PROJECT CONTEXT: {len(project_context)} files from workspace]\n" + "\n".join(project_context))
@@ -411,7 +436,7 @@ async def generate_code(query: AIQuery):
         if context_parts:
             enhanced_prompt = "\n\n".join(context_parts) + "\n\n[USER REQUEST]\n" + query.prompt
         
-        # print(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)}") # Removed to prevent UnicodeEncodeError
+        app_logger.debug(f"Enhanced prompt length: {len(enhanced_prompt)}")
         
         result = agent.generate(
             enhanced_prompt, 
@@ -421,14 +446,16 @@ async def generate_code(query: AIQuery):
             query.enable_tools
         )
         
-        print(f"[DEBUG] Result: {result.get('message', '')[:100]}...")
-        print(f"[DEBUG] Tool calls: {len(result.get('tool_calls', []))}")
+        app_logger.info(f"AI generation completed - Response length: {len(result.get('message', ''))}")
+        app_logger.debug(f"Tool calls: {len(result.get('tool_calls', []))}")
+        
+        log_ai_request(query.provider, len(enhanced_prompt), len(result.get('message', '')))
         
         return result
     except Exception as e:
         import traceback
-        print(f"AI Generation Error: {e}")
-        print(traceback.format_exc())
+        log_error(e, "generate_code")
+        app_logger.error(traceback.format_exc())
         return {
             "message": f"Sorry, I encountered an error during generation: {str(e)}",
             "error": str(e),
@@ -509,9 +536,12 @@ class SerialConfig(BaseModel):
 
 @app.post("/serial/connect")
 async def serial_connect(config: SerialConfig):
+    log_request("/serial/connect", "POST", {"path": config.path, "baudrate": config.baudrate})
     success = await serial_manager.connect(config.path, config.baudrate)
     if not success:
+        app_logger.error(f"Could not connect to {config.path}")
         raise HTTPException(status_code=400, detail=f"Could not connect to {config.path}")
+    app_logger.info(f"Connected to serial port {config.path} at {config.baudrate} baud")
     return {"status": "success", "message": f"Connected to {config.path}"}
 
 @app.post("/serial/disconnect")
@@ -533,5 +563,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
+    app_logger.info("Starting Uvicorn server on 127.0.0.1:8001")
     # Use frozen port 8001, loop='asyncio' to avoid compatibility issues in frozen apps
     uvicorn.run(app, host="127.0.0.1", port=8001)

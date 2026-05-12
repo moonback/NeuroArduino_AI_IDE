@@ -1,0 +1,6 @@
+# Ignorer tous les fichiers de log
+# *.log
+
+# Garder le README
+!README.md
+!.gitignore

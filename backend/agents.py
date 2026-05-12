@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 from tools_registry import ToolRegistry
 from system_prompts import get_prompt_manager
 
+# Import Logger
+from logger_config import app_logger, log_error, log_tool_call, log_ai_request
+
 # Env Loading Logic
 search_paths = [
     os.path.join(os.getcwd(), ".env"),
@@ -25,10 +28,10 @@ for p in search_paths:
         break
 
 if env_path:
-    print(f"Loading .env from: {env_path}")
+    app_logger.info(f"Loading .env from: {env_path}")
     load_dotenv(env_path, override=True)
 else:
-    print("Warning: No .env file found!")
+    app_logger.warning("No .env file found!")
 
 class CodeGeneratorAgent:
     def __init__(self, workspace_root: str = None):
@@ -76,6 +79,8 @@ class CodeGeneratorAgent:
 
         history = history or []
 
+        app_logger.info(f"Generating code with provider: {provider}, board: {board}, tools: {enable_tools}")
+
         # 1. OpenRouter Provider (replaces Groq, uses OpenAI-compatible API)
         if provider == "openrouter" and self.openrouter_client:
             try:
@@ -88,11 +93,13 @@ class CodeGeneratorAgent:
                 # Add current prompt
                 messages.append({"role": "user", "content": prompt})
 
+                log_ai_request(provider, len(prompt))
+
                 # OpenRouter supports function calling (OpenAI-compatible)
                 if enable_tools:
                     try:
-                        print(f"[DEBUG] Calling OpenRouter with tools enabled")
-                        print(f"[DEBUG] Number of tools available: {len(self.tool_registry.get_tool_definitions())}")
+                        app_logger.debug(f"Calling OpenRouter with tools enabled")
+                        app_logger.debug(f"Number of tools available: {len(self.tool_registry.get_tool_definitions())}")
                         
                         completion = self.openrouter_client.chat.completions.create(
                             messages=messages,
@@ -107,12 +114,12 @@ class CodeGeneratorAgent:
                         content = response_message.content or ""
                         tool_calls_present = hasattr(response_message, 'tool_calls') and response_message.tool_calls is not None
                         
-                        print(f"[DEBUG] Content: {content[:100] if content else 'None'}")
-                        print(f"[DEBUG] Response has tool_calls: {tool_calls_present}")
+                        app_logger.debug(f"Content length: {len(content) if content else 0}")
+                        app_logger.debug(f"Response has tool_calls: {tool_calls_present}")
                         
                         # Check if AI wants to use tools
                         if tool_calls_present and response_message.tool_calls:
-                            print(f"[DEBUG] AI wants to use {len(response_message.tool_calls)} tool(s)")
+                            app_logger.info(f"AI wants to use {len(response_message.tool_calls)} tool(s)")
                             tool_calls = []
                             tool_results = []
                             
@@ -120,13 +127,14 @@ class CodeGeneratorAgent:
                                 tool_name = tool_call.function.name
                                 tool_params = json.loads(tool_call.function.arguments)
                                 
-                                print(f"[DEBUG] Executing tool: {tool_name}")
-                                print(f"[DEBUG] Parameters: {tool_params}")
+                                app_logger.info(f"Executing tool: {tool_name}")
+                                app_logger.debug(f"Parameters: {tool_params}")
                                 
                                 # Execute tool
                                 result = self.tool_registry.execute_tool(tool_name, tool_params)
                                 
-                                print(f"[DEBUG] Tool result: {result.get('status', 'unknown')}")
+                                app_logger.info(f"Tool result: {result.get('status', 'unknown')}")
+                                log_tool_call(tool_name, tool_params, str(result))
                                 
                                 tool_calls.append({
                                     "id": tool_call.id,
